@@ -4,6 +4,7 @@
 
 #include "nandflash.h"
 #include "jz4740.h"
+#include "usb_boot.h"
 
 #define __nand_enable()		(REG_EMC_NFCSR |= EMC_NFCSR_NFE1 | EMC_NFCSR_NFCE1)
 #define __nand_disable()	(REG_EMC_NFCSR &= ~(EMC_NFCSR_NFCE1))
@@ -53,10 +54,36 @@ static u32 bad_block_pos = 0;
 static u8 data_buf[2048] = {0};
 static u8 oob_buf[128] = {0};
 
+const u8 oob_config_64[64] = 
+{
+40, 41, 42, 43, 44, 45, 46, 47, 
+48, 49, 50, 51, 52, 53, 54, 55, 
+56, 57, 58, 59, 60, 61, 62, 63
+};
+
+
+static const u8 nand_ecc_precalc_table[] = {
+	0x00, 0x55, 0x56, 0x03, 0x59, 0x0c, 0x0f, 0x5a, 0x5a, 0x0f, 0x0c, 0x59, 0x03, 0x56, 0x55, 0x00,
+	0x65, 0x30, 0x33, 0x66, 0x3c, 0x69, 0x6a, 0x3f, 0x3f, 0x6a, 0x69, 0x3c, 0x66, 0x33, 0x30, 0x65,
+	0x66, 0x33, 0x30, 0x65, 0x3f, 0x6a, 0x69, 0x3c, 0x3c, 0x69, 0x6a, 0x3f, 0x65, 0x30, 0x33, 0x66,
+	0x03, 0x56, 0x55, 0x00, 0x5a, 0x0f, 0x0c, 0x59, 0x59, 0x0c, 0x0f, 0x5a, 0x00, 0x55, 0x56, 0x03,
+	0x69, 0x3c, 0x3f, 0x6a, 0x30, 0x65, 0x66, 0x33, 0x33, 0x66, 0x65, 0x30, 0x6a, 0x3f, 0x3c, 0x69,
+	0x0c, 0x59, 0x5a, 0x0f, 0x55, 0x00, 0x03, 0x56, 0x56, 0x03, 0x00, 0x55, 0x0f, 0x5a, 0x59, 0x0c,
+	0x0f, 0x5a, 0x59, 0x0c, 0x56, 0x03, 0x00, 0x55, 0x55, 0x00, 0x03, 0x56, 0x0c, 0x59, 0x5a, 0x0f,
+	0x6a, 0x3f, 0x3c, 0x69, 0x33, 0x66, 0x65, 0x30, 0x30, 0x65, 0x66, 0x33, 0x69, 0x3c, 0x3f, 0x6a,
+	0x6a, 0x3f, 0x3c, 0x69, 0x33, 0x66, 0x65, 0x30, 0x30, 0x65, 0x66, 0x33, 0x69, 0x3c, 0x3f, 0x6a,
+	0x0f, 0x5a, 0x59, 0x0c, 0x56, 0x03, 0x00, 0x55, 0x55, 0x00, 0x03, 0x56, 0x0c, 0x59, 0x5a, 0x0f,
+	0x0c, 0x59, 0x5a, 0x0f, 0x55, 0x00, 0x03, 0x56, 0x56, 0x03, 0x00, 0x55, 0x0f, 0x5a, 0x59, 0x0c,
+	0x69, 0x3c, 0x3f, 0x6a, 0x30, 0x65, 0x66, 0x33, 0x33, 0x66, 0x65, 0x30, 0x6a, 0x3f, 0x3c, 0x69,
+	0x03, 0x56, 0x55, 0x00, 0x5a, 0x0f, 0x0c, 0x59, 0x59, 0x0c, 0x0f, 0x5a, 0x00, 0x55, 0x56, 0x03,
+	0x66, 0x33, 0x30, 0x65, 0x3f, 0x6a, 0x69, 0x3c, 0x3c, 0x69, 0x6a, 0x3f, 0x65, 0x30, 0x33, 0x66,
+	0x65, 0x30, 0x33, 0x66, 0x3c, 0x69, 0x6a, 0x3f, 0x3f, 0x6a, 0x69, 0x3c, 0x66, 0x33, 0x30, 0x65,
+	0x00, 0x55, 0x56, 0x03, 0x59, 0x0c, 0x0f, 0x5a, 0x5a, 0x0f, 0x0c, 0x59, 0x03, 0x56, 0x55, 0x00
+};
 
 static inline void __nand_sync(void)
 {
-	unsigned int timeout = 100000;
+	unsigned int timeout = 5000;
 	while ((REG_GPIO_PXPIN(2) & 0x40000000) && timeout--);
 	while (!(REG_GPIO_PXPIN(2) & 0x40000000));
 }
@@ -80,23 +107,107 @@ static nand_init_gpio(void)
 	__gpio_as_nand();
 }
 
-void nand_enable_4740(unsigned int csn)
+inline void nand_enable_4740(unsigned int csn)
 {
 	//modify this fun to a specifical borad
 	//this fun to enable the chip select pin csn
 	//the choosn chip can work after this fun
-	printf("\n Enable chip select :%d",csn);
+	//dprintf("\n Enable chip select :%d",csn);
 	__nand_enable();
 }
 
-void nand_disable_4740(unsigned int csn)
+inline void nand_disable_4740(unsigned int csn)
 {
 	//modify this fun to a specifical borad
 	//this fun to enable the chip select pin csn
 	//the choosn chip can not work after this fun
-	printf("\n Disable chip select :%d",csn);
+	//dprintf("\n Disable chip select :%d",csn);
 	__nand_disable();
 }
+
+
+/**
+ * nand_trans_result - [GENERIC] create non-inverted ECC
+ * @reg2:	line parity reg 2
+ * @reg3:	line parity reg 3
+ * @ecc_code:	ecc 
+ *
+ * Creates non-inverted ECC code from line parity
+ */
+static void nand_trans_result(u8 reg2, u8 reg3,	u8 *ecc_code)
+{
+	u8 a, b, i, tmp1, tmp2;
+	
+	/* Initialize variables */
+	a = b = 0x80;
+	tmp1 = tmp2 = 0;
+	
+	/* Calculate first ECC byte */
+	for (i = 0; i < 4; i++) {
+		if (reg3 & a)		/* LP15,13,11,9 --> ecc_code[0] */
+			tmp1 |= b;
+		b >>= 1;
+		if (reg2 & a)		/* LP14,12,10,8 --> ecc_code[0] */
+			tmp1 |= b;
+		b >>= 1;
+		a >>= 1;
+	}
+	
+	/* Calculate second ECC byte */
+	b = 0x80;
+	for (i = 0; i < 4; i++) {
+		if (reg3 & a)		/* LP7,5,3,1 --> ecc_code[1] */
+			tmp2 |= b;
+		b >>= 1;
+		if (reg2 & a)		/* LP6,4,2,0 --> ecc_code[1] */
+			tmp2 |= b;
+		b >>= 1;
+		a >>= 1;
+	}
+	
+	/* Store two of the ECC bytes */
+	ecc_code[0] = tmp1;
+	ecc_code[1] = tmp2;
+}
+
+/**
+ * nand_calculate_ecc - [NAND Interface] Calculate 3 byte ECC code for 256 byte block
+ * @dat:	raw data
+ * @ecc_code:	buffer for ECC
+ */
+int nand_calculate_ecc(const u8 *dat, u8 *ecc_code)
+{
+	u8 idx, reg1, reg2, reg3;
+	int j;
+	
+	/* Initialize variables */
+	reg1 = reg2 = reg3 = 0;
+	ecc_code[0] = ecc_code[1] = ecc_code[2] = 0;
+	
+	/* Build up column parity */ 
+	for(j = 0; j < 256; j++) {
+		
+		/* Get CP0 - CP5 from table */
+		idx = nand_ecc_precalc_table[dat[j]];
+		reg1 ^= (idx & 0x3f);
+		
+		/* All bit XOR = 1 ? */
+		if (idx & 0x40) {
+			reg3 ^= (u8) j;
+			reg2 ^= ~((u8) j);
+		}
+	}
+	
+	/* Create non-inverted ECC code from line parity */
+	nand_trans_result(reg2, reg3, ecc_code);
+	
+	/* Calculate final ECC code */
+	ecc_code[0] = ~ecc_code[0];
+	ecc_code[1] = ~ecc_code[1];
+	ecc_code[2] = ((~reg1) << 2) | 0x03;
+	return 0;
+}
+
 
 unsigned int nand_query_4740(void)
 {
@@ -130,7 +241,10 @@ int nand_init_4740(int bus_width, int row_cycle, int page_size, int page_per_blo
 	/* Initialize NAND Flash Pins */
 	//__gpio_as_nand();
 	nand_init_gpio();
+	REG_EMC_SMCR1 = 0x022e2200;      //optimize speed???
+//	REG_EMC_SMCR1 = 0x000e0000;      //optimize speed???
 
+	printf("\n SMCR1:%x",REG_EMC_SMCR1);
 	//__nand_enable();
 
 	if (bus == 8) {
@@ -207,7 +321,7 @@ int nand_read_raw_4740(void *buf, u32 startpage, u32 pagenum)
 	cur_page = startpage;
 	cnt = 0;
 	while (cnt < pagenum) {
-		__nand_sync();
+		//__nand_sync();
 		__nand_cmd(CMD_READA);
 		__nand_addr(0);
 		if (pagesize == 2048)
@@ -226,6 +340,9 @@ int nand_read_raw_4740(void *buf, u32 startpage, u32 pagenum)
 		read_proc(tmpbuf, pagesize);
 
 		tmpbuf += pagesize;
+		read_oob(tmpbuf, oobsize, cur_page);
+		tmpbuf += oobsize;
+
 		cur_page++;
 		cnt++;
 	}
@@ -245,7 +362,7 @@ int nand_erase_4740(int blk_num, int sblk, int force, void (*notify)(int))
 
 		if (!force) {	/* if set, erase anything */
 			/* test Badflag. */
-			__nand_sync();
+			//__nand_sync();
 
 			__nand_cmd(CMD_READA);
 
@@ -368,7 +485,7 @@ void rs_correct(unsigned char *buf, int idx, int mask)
  * Skip bad block if detected.
  * HW ECC is used.
  */
-int nand_read_4740(void *buf, u32 startpage, u32 pagenum)
+int nand_read_4740(void *buf, u32 startpage, u32 pagenum,int option)
 {
 	u32 j, k;
 	u32 cur_page, cur_blk, cnt, rowaddr, ecccnt;
@@ -390,7 +507,7 @@ int nand_read_4740(void *buf, u32 startpage, u32 pagenum)
 		/* read oob first */
 		read_oob(oob_buf, oobsize, cur_page);
 
-		__nand_sync();
+		//__nand_sync();
 		__nand_cmd(CMD_READA);
 
 		__nand_addr(0);
@@ -444,13 +561,13 @@ int nand_read_4740(void *buf, u32 startpage, u32 pagenum)
 					u32 errcnt = (stat & EMC_NFINTS_ERRCNT_MASK) >> EMC_NFINTS_ERRCNT_BIT;
 					switch (errcnt) {
 					case 4:
-						rs_correct(data_buf, (REG_EMC_NFERR3 & EMC_NFERR_INDEX_MASK) >> EMC_NFERR_INDEX_BIT, (REG_EMC_NFERR3 & EMC_NFERR_MASK_MASK) >> EMC_NFERR_MASK_BIT);
+						rs_correct(tmpbuf, (REG_EMC_NFERR3 & EMC_NFERR_INDEX_MASK) >> EMC_NFERR_INDEX_BIT, (REG_EMC_NFERR3 & EMC_NFERR_MASK_MASK) >> EMC_NFERR_MASK_BIT);
 					case 3:
-						rs_correct(data_buf, (REG_EMC_NFERR2 & EMC_NFERR_INDEX_MASK) >> EMC_NFERR_INDEX_BIT, (REG_EMC_NFERR2 & EMC_NFERR_MASK_MASK) >> EMC_NFERR_MASK_BIT);
+						rs_correct(tmpbuf, (REG_EMC_NFERR2 & EMC_NFERR_INDEX_MASK) >> EMC_NFERR_INDEX_BIT, (REG_EMC_NFERR2 & EMC_NFERR_MASK_MASK) >> EMC_NFERR_MASK_BIT);
 					case 2:
-						rs_correct(data_buf, (REG_EMC_NFERR1 & EMC_NFERR_INDEX_MASK) >> EMC_NFERR_INDEX_BIT, (REG_EMC_NFERR1 & EMC_NFERR_MASK_MASK) >> EMC_NFERR_MASK_BIT);
+						rs_correct(tmpbuf, (REG_EMC_NFERR1 & EMC_NFERR_INDEX_MASK) >> EMC_NFERR_INDEX_BIT, (REG_EMC_NFERR1 & EMC_NFERR_MASK_MASK) >> EMC_NFERR_MASK_BIT);
 					case 1:
-						rs_correct(data_buf, (REG_EMC_NFERR0 & EMC_NFERR_INDEX_MASK) >> EMC_NFERR_INDEX_BIT, (REG_EMC_NFERR0 & EMC_NFERR_MASK_MASK) >> EMC_NFERR_MASK_BIT);
+						rs_correct(tmpbuf, (REG_EMC_NFERR0 & EMC_NFERR_INDEX_MASK) >> EMC_NFERR_INDEX_BIT, (REG_EMC_NFERR0 & EMC_NFERR_MASK_MASK) >> EMC_NFERR_MASK_BIT);
 						break;
 					default:
 						break;
@@ -462,22 +579,44 @@ int nand_read_4740(void *buf, u32 startpage, u32 pagenum)
 			tmpbuf += ECC_BLOCK;
 		}
 
-		tmpbuf = (u8 *)((u32)buf + cnt * pagesize);
-		p = (u8 *)data_buf;
-		for (j = 0; j < pagesize; j++)
-			tmpbuf[j] = p[j];
+		switch (option)
+		{
+		case	OOB_ECC:
+			tmpbuf = (u8 *)((u32)buf + cnt * (pagesize + oobsize));
+			p = (u8 *)data_buf;
+			for (j = 0; j < pagesize; j++)
+				tmpbuf[j] = p[j];
+			for (j = 0; j < oobsize; j++)
+				tmpbuf[pagesize+j] = oob_buf[j];
+
+			break;
+		case	OOB_NO_ECC:
+			break;
+		case	NO_OOB:
+			tmpbuf = (u8 *)((u32)buf + cnt * pagesize);
+			p = (u8 *)data_buf;
+			for (j = 0; j < pagesize; j++)
+				tmpbuf[j] = p[j];
+			break;
+		}
+
 		cur_page++;
 		cnt++;
 	}
 	return 0;
 }
 
-int nand_program_4740(void *context, int spage, int pages, void (*notify)(int))
+int calc_soft_ecc()
 {
-	u32 i, j, cur, rowaddr;
-	u8 *tmpbuf;
-	u32 ecccnt;
-	u8 ecc_buf[64];
+	return 1;
+}
+
+int nand_program_oob_4740(void *context, int spage, int pages, void (*notify)(int))
+{
+	u32 i, j, cur, rowaddr,m;
+	u8 *tmpbuf,*data_poi;
+	u32 ecccnt,datidx=0,eccidx=0;
+	u8 ecc_buf[64],oob_buf[64],ecc_code[3];
 
 	//printf("nand_program %d %d\n", spage, pages);
 
@@ -515,41 +654,36 @@ int nand_program_4740(void *context, int spage, int pages, void (*notify)(int))
 			__nand_addr(rowaddr & 0xff);
 			rowaddr >>= 8;
 		}
-
+		
+		data_poi = tmpbuf;
 		/* write out data */
-		for (j = 0; j < ecccnt; j++) {
-			volatile u8 *paraddr = (volatile u8 *)EMC_NFPAR0;
-			int k;
+		write_proc(tmpbuf, 2048);
+		tmpbuf += pagesize;
 
-			__nand_ecc_rs_encoding();
-			write_proc(tmpbuf, ECC_BLOCK);
-			__nand_ecc_encode_sync();
-			__nand_ecc_disable();
+		datidx = 0;
+		eccidx = 40;
 
-			/* Read PAR values */
-			for (k = 0; k < PAR_SIZE; k++) {
-				ecc_buf[j*PAR_SIZE+k] = *paraddr++;
-			}
-
-			tmpbuf += ECC_BLOCK;
+		for (m=0; m<8; m++)          //work out ecc code
+		{		
+			nand_calculate_ecc(&data_poi[datidx], ecc_code);
+			tmpbuf[eccidx++] = ecc_code[0];
+			tmpbuf[eccidx++] = ecc_code[0];
+			tmpbuf[eccidx++] = ecc_code[0];
+			datidx += 256;
 		}
 
-		/* Init oob buffer */
-		for (j = 0; j < oobsize; j++) {
-			oob_buf[j] = 0xff;
-		}
+		//dprintf("\n oob_buf %d",m);
+		/*for (m=0;m<64;m++)             //combine yaffs2 oob and ecc code
+		{
+			if (m<40) oob_buf[m] = tmpbuf[m];
+			else oob_buf[m] = ecc_buf[m];
+			//dprintf(" %x",oob_buf[m]);
+			}*/
 
-		for (j = 0; j < ecccnt*PAR_SIZE; j++) {
-			oob_buf[ECC_POS + j] = ecc_buf[j];
-		}
+		//write_proc((u8 *)oob_buf, oobsize);   //write entire oob to flash
+		write_proc((u8 *)tmpbuf, oobsize);
+		tmpbuf += oobsize;
 
-		/* Set page valid flag */
-		oob_buf[2] = 0;
-		oob_buf[3] = 0;
-		oob_buf[4] = 0;
-
-		/* write out oob buffer */
-		write_proc((u8 *)oob_buf, oobsize);
 
 		/* send program confirm command */
 		__nand_cmd(CMD_PGPROG);
@@ -561,6 +695,113 @@ int nand_program_4740(void *context, int spage, int pages, void (*notify)(int))
 		if (__nand_data8() & 0x01) { /* page program error */
 			if (notify)
 				notify(-1);
+		} else
+			if (notify)
+				notify(0);
+
+		i ++;
+		cur ++;
+	}
+	return 0;
+}
+
+int nand_program_4740(void *context, int spage, int pages, void (*notify)(int),int option)
+{
+	u32 i, j, cur, rowaddr;
+	u8 *tmpbuf;
+	u32 ecccnt;
+	u8 ecc_buf[64];
+
+	tmpbuf = (u8 *)context;
+	ecccnt = pagesize / ECC_BLOCK;
+
+	i = 0;
+	cur = spage;
+
+	while (i < pages) {
+		if ((cur % ppb) == 0) { /* First page of block, test BAD. */
+
+			read_oob(oob_buf, oobsize, cur);
+			if (oob_buf[0] != 0xff) { /* Bad block, skip */
+				printf("\n Bad block,skip!");
+				cur += ppb;
+				if (notify)
+					notify(-2);
+				continue;
+			}
+			rowaddr = cur;
+		}
+
+		__nand_cmd(CMD_SEQIN);
+
+		__nand_addr(0);
+		if (pagesize == 2048)
+			__nand_addr(0);
+		rowaddr = cur;
+		for (j = 0; j < row; j++) {
+			__nand_addr(rowaddr & 0xff);
+			rowaddr >>= 8;
+		}
+
+		switch (option)
+		{
+		case OOB_ECC:
+			write_proc(tmpbuf, pagesize);  //write data
+			tmpbuf += pagesize;
+			write_proc((u8 *)tmpbuf, oobsize); //write oob
+			tmpbuf += oobsize;
+
+			break;
+		case OOB_NO_ECC:          //do not supprot yet!
+			break;
+		case NO_OOB:              //bin image
+			/* write out data */
+			for (j = 0; j < ecccnt; j++) {
+				volatile u8 *paraddr = (volatile u8 *)EMC_NFPAR0;
+				int k;
+				
+				__nand_ecc_rs_encoding();
+				write_proc(tmpbuf, ECC_BLOCK);
+				__nand_ecc_encode_sync();
+				__nand_ecc_disable();
+
+				/* Read PAR values */
+				for (k = 0; k < PAR_SIZE; k++) {
+					ecc_buf[j*PAR_SIZE+k] = *paraddr++;
+				}
+				
+				tmpbuf += ECC_BLOCK;
+			}
+			
+			/* Init oob buffer */
+			for (j = 0; j < oobsize; j++) {
+				oob_buf[j] = 0xff;
+			}
+			
+			for (j = 0; j < ecccnt*PAR_SIZE; j++) {
+				oob_buf[ECC_POS + j] = ecc_buf[j];
+			}
+			
+			/* Set page valid flag */
+			oob_buf[2] = 0;
+			oob_buf[3] = 0;
+			oob_buf[4] = 0;
+			/* write out oob buffer */
+			write_proc((u8 *)oob_buf, oobsize);
+			
+			break;
+		}
+
+		/* send program confirm command */
+		__nand_cmd(CMD_PGPROG);
+		__nand_sync();
+
+		__nand_cmd(CMD_READ_STATUS);
+
+		if (__nand_data8() & 0x01) { /* page program error */
+			if (notify)
+				notify(-1);
+			printf("\n Program error!");
 		} else
 			if (notify)
 				notify(0);
