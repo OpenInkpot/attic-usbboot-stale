@@ -17,9 +17,10 @@ unsigned int nand_query_4740(void);
 int nand_init_4740(int bus_width, int row_cycle, int page_size, int page_per_block,
 	      u32 gbase, u32 ebase, u32 aport, u32 dport, u32 cport);
 int nand_fini_4740(void);
-int nand_program_4740(void *context, int spage, int pages, void (*notify)(int));
+int nand_program_4740(void *context, int spage, int pages, void (*notify)(int),int option);
+int nand_program_oob_4740(void *context, int spage, int pages, void (*notify)(int));
 int nand_erase_4740(int blk_num, int sblk, int force, void (*notify)(int));
-int nand_read_4740(void *buf, u32 startpage, u32 pagenum);
+int nand_read_4740(void *buf, u32 startpage, u32 pagenum,int option);
 int nand_read_oob_4740(void *buf, u32 startpage, u32 pagenum);
 int nand_read_raw_4740(void *buf, u32 startpage, u32 pagenum);
 void nand_enable_4740(u32 csn);

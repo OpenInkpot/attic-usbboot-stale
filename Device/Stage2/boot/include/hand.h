@@ -53,6 +53,7 @@ typedef struct {
 	int nand_ppb;
 	int nand_force_erase;
 	int nand_pn;
+	int nand_os;
 	unsigned int nand_ids;  /* vendor_id & device_id */
 
 	/* sdram info */

@@ -3,8 +3,8 @@
 
 #define dprintf(x...) printf(x);
 
-#define BULK_OUT_BUF_SIZE 0x100000      //buffer size :4M
-#define BULK_IN_BUF_SIZE 0x100000       //4M too
+#define BULK_OUT_BUF_SIZE 0x200000      //buffer size :4M
+#define BULK_IN_BUF_SIZE 0x200000       //4M too
 
 enum UDC_STATE
 {
@@ -23,6 +23,7 @@ enum USB_JZ4740_REQUEST            //add for USB_BOOT
 	VR_PROGRAM_START2,
 	VR_NOR_OPS,
 	VR_NAND_OPS,
+	VR_SDRAM_OPS,
 	VR_CONFIGRATION
 };
 
@@ -53,7 +54,14 @@ enum NAND_OPS_TYPE
 	NAND_ERASE,
 	NAND_READ,
 	NAND_PROGRAM,
+	NAND_PROGRAM_OOB,
 	NAND_READ_TO_RAM
+};
+
+enum SDRAM_OPS_TYPE
+{
+	SDRAM_LOAD,
+
 };
 
 enum DATA_STRUCTURE_OB
@@ -77,6 +85,14 @@ enum DATA_STRUCTURE_OB
 	NOR_FLASHTYPE_ERR,
 	OPS_NOTSUPPORT_ERR
 }USB_BOOT_STATUS;*/
+
+enum OPTION
+{
+	OOB_ECC,
+	OOB_NO_ECC,
+	NO_OOB,
+};
+
 
 
 #endif
