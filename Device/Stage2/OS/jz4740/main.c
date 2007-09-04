@@ -29,11 +29,6 @@ void TaskStart (void *data)
 	OSStatInit();
 	while(1)
 	{	
-		//printf(" OSTaskCtr:%d", OSTaskCtr);    /* Display #tasks running */
-		//printf(" OSCPUUsage:%d", OSCPUUsage);   /* Display CPU usage in % */
-		//printf(" OSCtxSwCt:%d\n", OSCtxSwCtr); /* Display #context switches per second */
-		//OSCtxSwCtr = 0;
-		//printf("\nI am still alive!");
 		OSTimeDlyHMSM(0, 0, 5, 0);     /* Wait one second */
 	}	
         //OSStatInit();                           /* Initialize uC/OS-II's statistics */
@@ -47,6 +42,7 @@ void APP_vMain (void)
 {
 	
         OSTaskCreate(TaskStart, (void *)0, (void *)&TaskStartStk[TASK_STK_SIZE - 1], 1);
+	detect_clock();
 	udc_init();
         OSStart();                              /* Start multitasking */
 	while(1);
