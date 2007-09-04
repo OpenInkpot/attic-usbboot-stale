@@ -243,9 +243,6 @@ void sendDevDesc(int size)
 {
        switch (size) {
 	case 18:
-		//devDesc.iSerialNumber = GetMassDevNum();
-		//if(devDesc.iSerialNumber > 0)
-		//devDesc.iSerialNumber--;
 		HW_SendPKT(0, &devDesc, sizeof(devDesc));
 		break;
 	default:
@@ -442,6 +439,10 @@ void usbHandleVendorReq(u8 *buf)
 		HW_SendPKT(1,handshake_PKT,sizeof(handshake_PKT));
 		Bulk_out_size = 0;
 		//Bulk_in_size = 0;
+		break;
+	case VR_SDRAM_OPS:
+		SDRAM_OPS_Handle(buf);
+		Bulk_out_size = 0;
 		break;
 	}
 	//handshake_PKT[3]=(u16)ret_state;
@@ -643,7 +644,7 @@ static void udcTaskEntry(void *arg)
 
 	dprintf("\nInit UDC");
 	usb_clearb(USB_REG_POWER,0x40);
-	udelay(1000);
+	udelay(100);
 	usb_setb(USB_REG_POWER,0x40);
 	USB_Version=USB_HS;
 //	handshake_PKT="";
@@ -667,6 +668,6 @@ void udc_init(void)
 	dprintf("\nCreate UDC task!");
 	OSTaskCreate(udcTaskEntry, (void *)0,
 		     (void *)&udcTaskStack[UDC_TASK_STK_SIZE - 1],
-		     4);
+		     2);
 }
 

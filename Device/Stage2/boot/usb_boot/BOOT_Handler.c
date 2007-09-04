@@ -19,9 +19,10 @@ unsigned int (*nand_query)(void);
 int (*nand_init)(int bus_width, int row_cycle, int page_size, int page_per_block,
 	      u32 gbase, u32 ebase, u32 aport, u32 dport, u32 cport);
 int (*nand_fini)(void);
-int (*nand_program)(void *context, int spage, int pages, void (*notify)(int));
+int (*nand_program)(void *context, int spage, int pages, void (*notify)(int),int option);
+int (*nand_program_oob)(void *context, int spage, int pages, void (*notify)(int));
 int (*nand_erase)(int blk_num, int sblk, int force, void (*notify)(int));
-int (*nand_read)(void *buf, u32 startpage, u32 pagenum);
+int (*nand_read)(void *buf, u32 startpage, u32 pagenum,int option);
 int (*nand_read_oob)(void *buf, u32 startpage, u32 pagenum);
 int (*nand_read_raw)(void *buf, u32 startpage, u32 pagenum);
 void (*nand_enable) (unsigned int csn);
@@ -49,7 +50,6 @@ u32 ram_addr;
 void config_flash_info()
 {
 }
-
 void config_hand()
 {
 	hand_t *hand_p;
@@ -60,8 +60,9 @@ void config_hand()
 	Hand.nand_ppb=hand_p->nand_ppb;
 	Hand.nand_force_erase=hand_p->nand_force_erase;
 	Hand.nand_pn=hand_p->nand_pn;
-	dprintf("\n Hand : bw %d rc %d ps %d ppb %d erase %d pn %d",
-		Hand.nand_bw,Hand.nand_rc,Hand.nand_ps,Hand.nand_ppb,Hand.nand_force_erase,Hand.nand_pn);
+	Hand.nand_os=hand_p->nand_os;
+	dprintf("\n Hand : bw %d rc %d ps %d ppb %d erase %d pn %d os %d",
+		Hand.nand_bw,Hand.nand_rc,Hand.nand_ps,Hand.nand_ppb,Hand.nand_force_erase,Hand.nand_pn,Hand.nand_os);
 }
 
 int GET_CUP_INFO_Handle()
@@ -108,6 +109,7 @@ int PROGRAM_START2_Handle(u8 *buf)
 	USB_DeviceRequest *dreq = (USB_DeviceRequest *)buf;
 	f=(void *) ((((u32)dreq->wValue)<<16)+(u32)dreq->wIndex);
 	dprintf("\n START2 addr: %x",(u32)f);
+	__dcache_writeback_all();
 	f();
 	return ERR_OK;
 }
@@ -115,71 +117,6 @@ int PROGRAM_START2_Handle(u8 *buf)
 int NOR_OPS_Handle(u8 *buf)
 {
 	USB_DeviceRequest *dreq = (USB_DeviceRequest *)buf;
-	/*switch ((dreq->wValue)>>4)
-	{
-	case NOR_AM29:
-		flash_init =NULL;
-		flash_query=am29_query;
-		flash_write=am29_write;
-		flash_erase_chip=am29_erase_chip;
-		flash_erase_sector=am29_erase_sector;
-
-		break;
-	case NOR_SST28:
-		flash_init=sst28_init;
-		flash_query=NULL;
-		flash_write=sst28_write;
-		flash_erase_chip=sst28_erase_chip;
-		flash_erase_sector=sst28_erase_sector;
-
-		break;
-	case NOR_SST39x16:
-		flash_init =sst39x16_init;
-		flash_query=NULL;
-		flash_write=sst39x16_write;
-		flash_erase_chip=sst39x16_erase_chip;
-		flash_erase_sector=sst39x16_erase_sector;
-
-		break;
-	case NOR_SST39x8:
-		flash_init =sst39x8_init;
-		flash_query=NULL;
-		flash_write=sst39x8_write;
-		flash_erase_chip=sst39x8_erase_chip;
-		flash_erase_sector=sst39x8_erase_sector;
-
-		break;
-	default:
-		return NOR_FLASHTYPE_ERR;
-	}
-	*/
-
-	switch ((dreq->wValue)&0xf)
-	{
-	case NOR_INIT:
-		dprintf("\n Request : NOR_INIT!");
-		if (flash_init!=NULL) flash_init(&Info);
-		break;
-	case NOR_QUERY:
-		dprintf("\n Request : NOR_QUERY!");
-		if (flash_query!=NULL) flash_query(&Info);
-		break;
-	case NOR_WRITE:
-		dprintf("\n Request : NOR_WRITE!");
-		flash_write(&Info,(void *)Bulk_out_buf,(void *)start_addr, ops_length);
-		break;
-	case NOR_ERASE_CHIP:
-		dprintf("\n Request : NOR_ERASE_CHIP!");
-		flash_erase_chip(&Info);
-		break;
-	case NOR_ERASE_SECTOR:
-		dprintf("\n Request : NOR_ERASE_SECTOR!");
-		flash_erase_sector(&Info,(void *)start_addr,ops_length);
-		break;
-	default:
-		return ERR_OPS_NOTSUPPORT;
-	}
-
 	return ERR_OK;
 }
 
@@ -187,9 +124,11 @@ int NAND_OPS_Handle(u8 *buf)
 {
 	USB_DeviceRequest *dreq = (USB_DeviceRequest *)buf;
 	u32 temp;
+	int option;
 	u8 CSn;
 
 	CSn = (dreq->wValue>>4) & 0xff;
+	option = (dreq->wValue>>12) & 0xff;
 	nand_enable(CSn);
 	switch ((dreq->wValue)&0xf)
 	{
@@ -210,19 +149,19 @@ int NAND_OPS_Handle(u8 *buf)
 		break;
 	case NAND_READ_OOB:
 		dprintf("\n Request : NAND_READ_OOB!");
-		temp = ops_length / Hand.nand_ps + 1;
+		//temp = ops_length / Hand.nand_ps + 1;
 		//dprintf("\n temp %d",temp);
-		nand_read_oob(Bulk_in_buf,start_addr,temp);
-		HW_SendPKT(1,Bulk_in_buf,temp*Hand.nand_ps);
+		nand_read_oob(Bulk_in_buf,start_addr,ops_length);
+		HW_SendPKT(1,Bulk_in_buf,ops_length*Hand.nand_ps);
 		handshake_PKT[3]=(u16)ERR_OK;
-		udc_state = BULK_IN;
+		udc_state = BULK_IN;		
 		break;
 	case NAND_READ_RAW:
 		dprintf("\n Request : NAND_READ_RAW!");
-		temp = ops_length / Hand.nand_ps + 1;
+		//temp = ops_length / Hand.nand_ps + 1;
 		//dprintf("\n temp %d",temp);
-		nand_read_raw(Bulk_in_buf,start_addr,temp);
-		HW_SendPKT(1,Bulk_in_buf,temp*Hand.nand_ps);
+		nand_read_raw(Bulk_in_buf,start_addr,ops_length);
+		HW_SendPKT(1,Bulk_in_buf,ops_length*(Hand.nand_ps + Hand.nand_os));
 		handshake_PKT[3]=(u16)ERR_OK;
 		udc_state = BULK_IN;
 		break;
@@ -236,24 +175,51 @@ int NAND_OPS_Handle(u8 *buf)
 		break;
 	case NAND_READ:
 		dprintf("\n Request : NAND_READ!");
- 		temp = ops_length / Hand.nand_ps + 1; 
-		nand_read_4740(Bulk_in_buf,start_addr,temp);
-		HW_SendPKT(1,Bulk_in_buf,temp*Hand.nand_ps);
-		handshake_PKT[3]=(u16)ERR_OK;
-		udc_state = BULK_IN;
+		dprintf("\n Option : %x",option);
+		switch (option)
+		{
+		case 	OOB_ECC:
+			nand_read_4740(Bulk_in_buf,start_addr,ops_length,OOB_ECC);
+			HW_SendPKT(1,Bulk_in_buf,ops_length*(Hand.nand_ps + Hand.nand_os ));
+			handshake_PKT[3]=(u16)ERR_OK;
+			udc_state = BULK_IN;
+			break;
+		case 	OOB_NO_ECC:
+			handshake_PKT[3]=(u16)ERR_OK;
+			HW_SendPKT(1,handshake_PKT,sizeof(handshake_PKT));
+			udc_state = IDLE;
+			break;
+		case 	NO_OOB:
+			nand_read_4740(Bulk_in_buf,start_addr,ops_length,NO_OOB);
+			HW_SendPKT(1,Bulk_in_buf,ops_length*Hand.nand_ps);
+			handshake_PKT[3]=(u16)ERR_OK;
+			udc_state = BULK_IN;
+			break;
+		}
+
 		break;
 	case NAND_PROGRAM:
 		dprintf("\n Request : NAND_PROGRAM!");
+		dprintf("\n Option : %x",option);
 		nand_program((void *)Bulk_out_buf,
-			     start_addr,ops_length,NULL);
+			     start_addr,ops_length,NULL,option);
 		dprintf("\n NAND_PROGRAM finish!");
+		handshake_PKT[3]=(u16)ERR_OK;
+		HW_SendPKT(1,handshake_PKT,sizeof(handshake_PKT));
+		udc_state = IDLE;
+		break;
+	case NAND_PROGRAM_OOB:
+		dprintf("\n Request : NAND_PROGRAM_OOB!");
+		nand_program_oob((void *)Bulk_out_buf,
+			     start_addr,ops_length,NULL);
+		dprintf("\n NAND_PROGRAM_OOB finish!");
 		handshake_PKT[3]=(u16)ERR_OK;
 		HW_SendPKT(1,handshake_PKT,sizeof(handshake_PKT));
 		udc_state = IDLE;
 		break;
 	case NAND_READ_TO_RAM:
 		dprintf("\n Request : NAND_READNAND!");
-		nand_read((u8 *)ram_addr,start_addr,ops_length);
+		nand_read((u8 *)ram_addr,start_addr,ops_length,NO_OOB);
 		__dcache_writeback_all();
 		handshake_PKT[3]=(u16)ERR_OK;
 		HW_SendPKT(1,handshake_PKT,sizeof(handshake_PKT));
@@ -265,6 +231,28 @@ int NAND_OPS_Handle(u8 *buf)
 	}
 
 	nand_disable(CSn);
+	return ERR_OK;
+}
+
+int SDRAM_OPS_Handle(u8 *buf)
+{
+	USB_DeviceRequest *dreq = (USB_DeviceRequest *)buf;
+	u32 temp,i;
+	u8 *obj;
+
+	switch ((dreq->wValue)&0xf)
+	{
+	case 	SDRAM_LOAD:
+		dprintf(" Request : SDRAM_LOAD!");
+		memcpy((u8 *)start_addr,Bulk_out_buf,ops_length);
+		//obj = (u8 *)ram_addr;
+		//for (i=0;i<ops_length;i++)
+		//obj[i] = Bulk_out_buf[i];
+		handshake_PKT[3]=(u16)ERR_OK;
+		HW_SendPKT(1,handshake_PKT,sizeof(handshake_PKT));
+		udc_state = IDLE;
+		break;
+	}
 	return ERR_OK;
 }
 
@@ -280,6 +268,7 @@ void Borad_Init()
 	nand_init_4740(Hand.nand_bw,Hand.nand_rc,Hand.nand_ps,Hand.nand_ppb,
 		gbase, ebase, aport, dport, cport);
 	nand_program=nand_program_4740;
+	nand_program_oob=nand_program_oob_4740;
 	nand_erase  =nand_erase_4740;
 	nand_read   =nand_read_4740;
 	nand_read_oob=nand_read_oob_4740;
