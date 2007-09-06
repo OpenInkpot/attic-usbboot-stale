@@ -228,6 +228,47 @@ typedef unsigned int u32;
 #define CPM_RSR_WR		(1 << 1)
 #define CPM_RSR_PR		(1 << 0)
 
+/*************************************************************************
+ * UDC 
+ *************************************************************************/
+#define USB_BASE  UDC_BASE
+
+#define USB_REG_FADDR		(USB_BASE + 0x00) /* Function Address 8-bit */
+#define USB_REG_POWER		(USB_BASE + 0x01) /* Power Managemetn 8-bit */
+#define USB_REG_INTRIN		(USB_BASE + 0x02) /* Interrupt IN 16-bit */
+#define USB_REG_INTROUT		(USB_BASE + 0x04) /* Interrupt OUT 16-bit */
+#define USB_REG_INTRINE		(USB_BASE + 0x06) /* Intr IN enable 16-bit */
+#define USB_REG_INTROUTE	(USB_BASE + 0x08) /* Intr OUT enable 16-bit */
+#define USB_REG_INTRUSB		(USB_BASE + 0x0a) /* Interrupt USB 8-bit */
+#define USB_REG_INTRUSBE	(USB_BASE + 0x0b) /* Interrupt USB Enable 8-bit */
+#define USB_REG_FRAME		(USB_BASE + 0x0c) /* Frame number 16-bit */
+#define USB_REG_INDEX		(USB_BASE + 0x0e) /* Index register 8-bit */
+#define USB_REG_TESTMODE	(USB_BASE + 0x0f) /* USB test mode 8-bit */
+
+#define USB_REG_CSR0		(USB_BASE + 0x12) /* EP0 CSR 8-bit */
+#define USB_REG_INMAXP		(USB_BASE + 0x10) /* EP1-2 IN Max Pkt Size 16-bit */
+#define USB_REG_INCSR		(USB_BASE + 0x12) /* EP1-2 IN CSR LSB 8/16bit */
+#define USB_REG_INCSRH		(USB_BASE + 0x13) /* EP1-2 IN CSR MSB 8-bit */
+#define USB_REG_OUTMAXP		(USB_BASE + 0x14) /* EP1 OUT Max Pkt Size 16-bit */
+#define USB_REG_OUTCSR		(USB_BASE + 0x16) /* EP1 OUT CSR LSB 8/16bit */
+#define USB_REG_OUTCSRH		(USB_BASE + 0x17) /* EP1 OUT CSR MSB 8-bit */
+#define USB_REG_OUTCOUNT	(USB_BASE + 0x18) /* bytes in EP0/1 OUT FIFO 16-bit */
+
+#define USB_FIFO_EP0		(USB_BASE + 0x20)
+#define USB_FIFO_EP1		(USB_BASE + 0x24)
+#define USB_FIFO_EP2		(USB_BASE + 0x28)
+
+#define USB_REG_EPINFO		(USB_BASE + 0x78) /* Endpoint information */
+#define USB_REG_RAMINFO		(USB_BASE + 0x79) /* RAM information */
+
+#define USB_REG_INTR		(USB_BASE + 0x200) /* DMA pending interrupts */
+#define USB_REG_CNTL1		(USB_BASE + 0x204) /* DMA channel 1 control */
+#define USB_REG_ADDR1		(USB_BASE + 0x208) /* DMA channel 1 AHB memory addr */
+#define USB_REG_COUNT1		(USB_BASE + 0x20c) /* DMA channel 1 byte count */
+#define USB_REG_CNTL2		(USB_BASE + 0x214) /* DMA channel 2 control */
+#define USB_REG_ADDR2		(USB_BASE + 0x218) /* DMA channel 2 AHB memory addr */
+#define USB_REG_COUNT2		(USB_BASE + 0x21c) /* DMA channel 2 byte count */
+
 
 /*************************************************************************
  * TCU (Timer Counter Unit)

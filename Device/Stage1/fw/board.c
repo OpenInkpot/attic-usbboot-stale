@@ -8,7 +8,9 @@
  */
 
 #include "jz4740.h"
-
+#define CFG_CPU_SPEED		384000000	/* CPU clock: 384 MHz */
+#define CFG_EXTAL		12000000	/* EXTAL freq: 12 MHz */
+#define	CFG_HZ			(CFG_EXTAL/256) /* incrementer freq */
 
 void leds(char *s)
 {
@@ -69,6 +71,43 @@ void gpio_init(void)
 	REG_GPIO_PXSELC(1) = 0x04000000;
 }
 
+void pll_init(void)
+{
+	register unsigned int cfcr, plcr1;
+	int n2FR[33] = {
+		0, 0, 1, 2, 3, 0, 4, 0, 5, 0, 0, 0, 6, 0, 0, 0,
+		7, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0,
+		9
+	};
+	//int div[5] = {1, 4, 4, 4, 4}; /* divisors of I:S:P:L:M */
+	int div[5] = {1, 3, 3, 3, 3}; /* divisors of I:S:P:L:M */
+	int nf, pllout2;
+
+	cfcr = CPM_CPCCR_CLKOEN |
+		(n2FR[div[0]] << CPM_CPCCR_CDIV_BIT) | 
+		(n2FR[div[1]] << CPM_CPCCR_HDIV_BIT) | 
+		(n2FR[div[2]] << CPM_CPCCR_PDIV_BIT) |
+		(n2FR[div[3]] << CPM_CPCCR_MDIV_BIT) |
+		(n2FR[div[4]] << CPM_CPCCR_LDIV_BIT);
+
+	pllout2 = (cfcr & CPM_CPCCR_PCS) ? CFG_CPU_SPEED : (CFG_CPU_SPEED / 2);
+
+	/* Init UHC clock */
+	//REG_CPM_UHCCDR = pllout2 / 48000000 - 1;
+
+	nf = CFG_CPU_SPEED * 2 / CFG_EXTAL;
+	plcr1 = ((nf - 2) << CPM_CPPCR_PLLM_BIT) | /* FD */
+		(0 << CPM_CPPCR_PLLN_BIT) |	/* RD=0, NR=2 */
+		(0 << CPM_CPPCR_PLLOD_BIT) |    /* OD=0, NO=1 */
+		(0x20 << CPM_CPPCR_PLLST_BIT) | /* PLL stable time */
+		CPM_CPPCR_PLLEN;                /* enable PLL */          
+
+	/* init PLL */
+	REG_CPM_CPCCR = cfcr;
+	REG_CPM_CPPCR = plcr1;
+} 
+
+
 //----------------------------------------------------------------------------
 // SDRAM paramters
 #define SDRAM_BW16		0	/* Data bus width: 0-32bit, 1-16bit */
@@ -89,9 +128,8 @@ void gpio_init(void)
 
 void sdram_init(void)
 {
-	register unsigned int dmcr, sdmode, tmp, ns;
-	volatile unsigned int *p;
-
+	register unsigned int dmcr, sdmode, tmp, cpu_clk, mem_clk, ns;
+	volatile unsigned int delay;
 	unsigned int cas_latency_sdmr[2] = {
 		EMC_SDMR_CAS_2,
 		EMC_SDMR_CAS_3,
@@ -101,6 +139,11 @@ void sdram_init(void)
 		1 << EMC_DMCR_TCL_BIT,	/* CAS latency is 2 */
 		2 << EMC_DMCR_TCL_BIT	/* CAS latency is 3 */
 	};
+
+	int div[] = {1, 2, 3, 4, 6, 8, 12, 16, 24, 32};
+
+	cpu_clk = CFG_CPU_SPEED;
+	mem_clk = cpu_clk * div[__cpm_get_cdiv()] / div[__cpm_get_mdiv()];
 
 	REG_EMC_RTCSR = EMC_RTCSR_CKS_DISABLE;
 	REG_EMC_RTCOR = 0;
@@ -114,42 +157,29 @@ void sdram_init(void)
 		EMC_DMCR_EPIN |
 		cas_latency_dmcr[((SDRAM_CASL == 3) ? 1 : 0)];
 
-	/* SDRAM timing parameters */
-	ns = 1000000000 / MEM_CLK;
+	/* SDRAM timimg parameters */
+	ns = 1000000000 / mem_clk;
 
 	tmp = SDRAM_TRAS/ns;
-	if (tmp < 4)
-		tmp = 4;
-	if (tmp > 11)
-		tmp = 11;
+	if (tmp < 4) tmp = 4;
+	if (tmp > 11) tmp = 11;
 	dmcr |= ((tmp-4) << EMC_DMCR_TRAS_BIT);
+
 	tmp = SDRAM_RCD/ns;
-	if (tmp > 3)
-		tmp = 3;
+	if (tmp > 3) tmp = 3;
 	dmcr |= (tmp << EMC_DMCR_RCD_BIT);
+
 	tmp = SDRAM_TPC/ns;
-	if (tmp > 7)
-		tmp = 7;
+	if (tmp > 7) tmp = 7;
 	dmcr |= (tmp << EMC_DMCR_TPC_BIT);
+
 	tmp = SDRAM_TRWL/ns;
-	if (tmp > 3)
-		tmp = 3;
+	if (tmp > 3) tmp = 3;
 	dmcr |= (tmp << EMC_DMCR_TRWL_BIT);
+
 	tmp = (SDRAM_TRAS + SDRAM_TPC)/ns;
-	if (tmp > 14)
-		tmp = 14;
+	if (tmp > 14) tmp = 14;
 	dmcr |= (((tmp + 1) >> 1) << EMC_DMCR_TRC_BIT);
-
-	/* SDRAM mode values */
-	sdmode = EMC_SDMR_BT_SEQ | 
-		 EMC_SDMR_OM_NORMAL |
-		 EMC_SDMR_BL_4 | 
-		 cas_latency_sdmr[((SDRAM_CASL == 3) ? 1 : 0)];
-
-	if (SDRAM_BW16)
-		sdmode <<= 1;
-	else
-		sdmode <<= 2;
 
 	/* First, precharge phase */
 	REG_EMC_DMCR = dmcr;
@@ -157,38 +187,29 @@ void sdram_init(void)
 	/* Set refresh registers */
 	tmp = SDRAM_TREF/ns;
 	tmp = tmp/64 + 1;
-	if (tmp > 0xff)
-		tmp = 0xff;
+	if (tmp > 0xff) tmp = 0xff;
 
 	REG_EMC_RTCOR = tmp;
 	REG_EMC_RTCSR = EMC_RTCSR_CKS_64;	/* Divisor is 64, CKO/64 */
 
+	/* SDRAM mode values */
+	sdmode = EMC_SDMR_BT_SEQ | 
+		 EMC_SDMR_OM_NORMAL |
+		 EMC_SDMR_BL_4 | 
+		 cas_latency_sdmr[((SDRAM_CASL == 3) ? 1 : 0)];
+
 	/* precharge all chip-selects */
 	REG8(EMC_SDMR0|sdmode) = 0;
-	REG8(EMC_SDMR1|sdmode) = 0;
 
 	/* wait for precharge, > 200us */
-	tmp = (CPU_CLK / 1000000) * 200;
-	while (tmp--);
+	delay = (cpu_clk / 1000000) * 200;
+	while (delay--);
 
 	/* enable refresh and set SDRAM mode */
 	REG_EMC_DMCR = dmcr | EMC_DMCR_RFSH | EMC_DMCR_MRSET;
 
 	/* write sdram mode register for each chip-select */
 	REG8(EMC_SDMR0|sdmode) = 0;
-	REG8(EMC_SDMR1|sdmode) = 0;
-
-	/* do simple memory check */
-	p = (volatile unsigned int *)(0xa0100000);
-	*p = 0x12345678;
-	p += 1;
-	*p = 0x87654321;    
-	p -= 1;
-
-	if (*p != 0x12345678) {
-		/* memory initialization failed */
-		while(1);
-	}
 
 	/* everything is ok now */
 }
