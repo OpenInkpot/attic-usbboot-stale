@@ -244,7 +244,7 @@ int nand_init_4740(int bus_width, int row_cycle, int page_size, int page_per_blo
 	REG_EMC_SMCR1 = 0x022e2200;      //optimize speed???
 //	REG_EMC_SMCR1 = 0x000e0000;      //optimize speed???
 
-	printf("\n SMCR1:%x",REG_EMC_SMCR1);
+//	printf("\n SMCR1:%x",REG_EMC_SMCR1);
 	//__nand_enable();
 
 	if (bus == 8) {
