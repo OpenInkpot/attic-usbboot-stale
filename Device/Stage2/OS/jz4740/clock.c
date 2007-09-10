@@ -28,7 +28,7 @@ void detect_clock(void)
 	cfcr = REG_CPM_CPCCR;
 	pllout = (__cpm_get_pllm() + 2)* EXTAL_CLK / (__cpm_get_plln() + 2);
 	iclk = pllout / FR2n[__cpm_get_cdiv()];
-	dprintf("EXTAL_CLK = %dM PLL = %d iclk = %d\r\n",EXTAL_CLK / 1000 /1000,pllout,iclk);
+	dprintf("\n Device work on:EXTAL_CLK = %dM PLL = %d iclk = %d",EXTAL_CLK / 1000 /1000,pllout,iclk);
 }
 
 void udelay(unsigned int usec)

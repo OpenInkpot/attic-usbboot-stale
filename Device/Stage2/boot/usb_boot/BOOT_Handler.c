@@ -9,12 +9,6 @@
 #include "udc.h"
 #define dprintf(x...) printf(x)
 
-/*int (*flash_init) (flash_info_t *info);
-int (*flash_query)(flash_info_t *info);
-int (*flash_write)(flash_info_t *info, void *buf, void *addr, int len);
-int (*flash_erase_chip)(flash_info_t *info);
-int (*flash_erase_sector)(flash_info_t *info, void *saddr, int size);
-*/
 unsigned int (*nand_query)(void);
 int (*nand_init)(int bus_width, int row_cycle, int page_size, int page_per_block,
 	      u32 gbase, u32 ebase, u32 aport, u32 dport, u32 cport);
@@ -28,28 +22,21 @@ int (*nand_read_raw)(void *buf, u32 startpage, u32 pagenum);
 void (*nand_enable) (unsigned int csn);
 void (*nand_disable) (unsigned int csn);
 
-//extern config_flash_info();
-//extern config_hand();
 hand_t Hand,*Hand_p;
 flash_info_t Info,*Info_p;
-//u32 code_buf[CODE_BUF_SIZE]; //buffer for code to be program to flash
 extern u32 Bulk_out_buf[BULK_OUT_BUF_SIZE];
 extern u32 Bulk_in_buf[BULK_IN_BUF_SIZE];
-//extern u32 Bulk_out_size,Bulk_in_size;
 extern u16 handshake_PKT[4];
 extern udc_state;
 u32 start_addr;  //program operation start address or sector
 u32 ops_length;  //number of operation unit ,in byte or sector
 u32 ram_addr;
 
-/*flash_info_t *def=
-{
-
-};*/
 
 void config_flash_info()
 {
 }
+
 void config_hand()
 {
 	hand_t *hand_p;
@@ -108,8 +95,10 @@ int PROGRAM_START2_Handle(u8 *buf)
 	void (*f)(void);
 	USB_DeviceRequest *dreq = (USB_DeviceRequest *)buf;
 	f=(void *) ((((u32)dreq->wValue)<<16)+(u32)dreq->wIndex);
-	dprintf("\n START2 addr: %x",(u32)f);
 	__dcache_writeback_all();
+	//stop udc connet before execute program!
+	jz_writeb(USB_REG_POWER,0x0);   //High speed
+	dprintf("\n Execute program at %x",(u32)f);
 	f();
 	return ERR_OK;
 }
@@ -151,6 +140,7 @@ int NAND_OPS_Handle(u8 *buf)
 		dprintf("\n Request : NAND_READ_OOB!");
 		//temp = ops_length / Hand.nand_ps + 1;
 		//dprintf("\n temp %d",temp);
+		memset(Bulk_in_buf,0,ops_length*Hand.nand_ps);
 		nand_read_oob(Bulk_in_buf,start_addr,ops_length);
 		HW_SendPKT(1,Bulk_in_buf,ops_length*Hand.nand_ps);
 		handshake_PKT[3]=(u16)ERR_OK;
@@ -208,15 +198,6 @@ int NAND_OPS_Handle(u8 *buf)
 		HW_SendPKT(1,handshake_PKT,sizeof(handshake_PKT));
 		udc_state = IDLE;
 		break;
-	case NAND_PROGRAM_OOB:
-		dprintf("\n Request : NAND_PROGRAM_OOB!");
-		nand_program_oob((void *)Bulk_out_buf,
-			     start_addr,ops_length,NULL);
-		dprintf("\n NAND_PROGRAM_OOB finish!");
-		handshake_PKT[3]=(u16)ERR_OK;
-		HW_SendPKT(1,handshake_PKT,sizeof(handshake_PKT));
-		udc_state = IDLE;
-		break;
 	case NAND_READ_TO_RAM:
 		dprintf("\n Request : NAND_READNAND!");
 		nand_read((u8 *)ram_addr,start_addr,ops_length,NO_OOB);
@@ -243,11 +224,8 @@ int SDRAM_OPS_Handle(u8 *buf)
 	switch ((dreq->wValue)&0xf)
 	{
 	case 	SDRAM_LOAD:
-		dprintf(" Request : SDRAM_LOAD!");
+		dprintf("\n Request : SDRAM_LOAD!");
 		memcpy((u8 *)start_addr,Bulk_out_buf,ops_length);
-		//obj = (u8 *)ram_addr;
-		//for (i=0;i<ops_length;i++)
-		//obj[i] = Bulk_out_buf[i];
 		handshake_PKT[3]=(u16)ERR_OK;
 		HW_SendPKT(1,handshake_PKT,sizeof(handshake_PKT));
 		udc_state = IDLE;

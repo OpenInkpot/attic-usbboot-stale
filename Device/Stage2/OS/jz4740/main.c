@@ -24,8 +24,6 @@ void TaskStart (void *data)
 
         data = data;                            /* Prevent compiler warning */
         JZ_StartTicker(OS_TICKS_PER_SEC);	/* os_cfg.h */
-        printf("\n USB Boot Device Software!");
-	printf("\n Waiting for host command!");
 	OSStatInit();
 	while(1)
 	{	
@@ -42,6 +40,8 @@ void APP_vMain (void)
 {
 	
         OSTaskCreate(TaskStart, (void *)0, (void *)&TaskStartStk[TASK_STK_SIZE - 1], 1);
+        printf("\n USB Boot Device Software!");
+	printf("\n Waiting for host command!");
 	detect_clock();
 	udc_init();
         OSStart();                              /* Start multitasking */

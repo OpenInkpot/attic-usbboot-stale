@@ -6,14 +6,11 @@
 #define dprintf(x...) 
 //printf(x)
 
-//extern code_buf;
-//static u32 rx_buf[1024];
 u32 Bulk_in_buf[BULK_IN_BUF_SIZE];
 u32 Bulk_out_buf[BULK_OUT_BUF_SIZE];
 static u32 rx_buf[512];
 static u32 tx_buf[1024];
 static u32 tx_size, rx_size, finished;
-//static 
 u32 Bulk_in_size,Bulk_in_finish,Bulk_out_size;
 static u32 fifo, curep;
 static OS_EVENT *udcEvent;
@@ -99,10 +96,7 @@ void HW_SendZeroPKT(int ep)
 void HW_SendPKT(int ep, const u8 *buf, int size)
 {
 	dprintf("EP%d send pkt :%d\n", ep, size);
-	//memcpy((void *)tx_buf, buf, size);
 	fifo = fifoaddr[ep];
-	//tx_size = size;
-	//finished = 0;
 
 	if (ep!=0)
 	{
@@ -268,8 +262,6 @@ void sendConfDesc(int size)
 
 void EP0_init(u32 out, u32 out_size, u32 in, u32 in_size)
 {
-	//epout = out;
-	//epin = in;
 	confDesc.endpoint_descriptor[0].bEndpointAddress = (1<<7) | in;
 	confDesc.endpoint_descriptor[0].wMaxPacketSize = in_size;
 	confDesc.endpoint_descriptor[1].bEndpointAddress = (0<<7) | out;
@@ -288,7 +280,6 @@ static void udc_reset(void)
 	tx_size = 0;
 	rx_size = 0;
 	finished = 0;
-	//__cpm_stop_udc();
 	/* Enable the USB PHY */
 	REG_CPM_SCR |= CPM_SCR_USBPHY_ENABLE;
 	/* Disable interrupts */
@@ -445,9 +436,6 @@ void usbHandleVendorReq(u8 *buf)
 		Bulk_out_size = 0;
 		break;
 	}
-	//handshake_PKT[3]=(u16)ret_state;
-	//HW_SendPKT(0, 0, 0);
-	//HW_SendPKT(1,&handshake_PKT,sizeof(handshake_PKT));
 }
 
 void Handshake_PKT()
@@ -459,7 +447,6 @@ void Handshake_PKT()
 		udc_state = IDLE;
 		dprintf("\n Send handshake PKT!");
 	}
-	//else udc_state=IDLE;
 }
 
 void usbHandleDevReq(u8 *buf)
@@ -470,12 +457,9 @@ void usbHandleDevReq(u8 *buf)
 		usbHandleStandDevReq(buf);
 		break;
 	case 1: /* Class request */
-		//usbHandleClassDevReq(buf);
-		//ep0state=USB_EP0_TX;
 		break;
 	case 2: /* Vendor request */
 		usbHandleVendorReq(buf);
-		//ep0state=USB_EP0_TX;
 		break;
 	}
 }
@@ -582,14 +566,12 @@ void EPIN_Handler(u8 EP)
 void EPOUT_Handler(u8 EP)
 {
 	u32 size;
-	//printf("\n set OUT!");
 	jz_writeb(USB_REG_INDEX, EP);
 	size = jz_readw(USB_REG_OUTCOUNT);
 	fifo = fifoaddr[EP];
 	udcReadFifo((u8 *)((u32)Bulk_out_buf+Bulk_out_size), size);
 	usb_clearb(USB_REG_OUTCSR,USB_OUTCSR_OUTPKTRDY);
 	Bulk_out_size += size;
-	//USB_HandleUFICmd();
 	dprintf("\nEPOUT_handle return!");
 }
 
@@ -644,17 +626,15 @@ static void udcTaskEntry(void *arg)
 
 	dprintf("\nInit UDC");
 	usb_clearb(USB_REG_POWER,0x40);
-	udelay(100);
+	udelay(60);
 	usb_setb(USB_REG_POWER,0x40);
 	USB_Version=USB_HS;
-//	handshake_PKT="";
 	udcEvent = OSSemCreate(0);
 	request_irq(IRQ_UDC, udcIntrHandler, 0);
 	udc_reset();
 	__intc_unmask_irq(IRQ_UDC);
 	while (1) {
 		OSSemPend(udcEvent, 0, &err);
-		//if (USB_Version==USB_FS) printf("\nUDC task!");
 		udc4740Proc();
 		__intc_unmask_irq(IRQ_UDC);
 	}
@@ -665,7 +645,6 @@ static OS_STK udcTaskStack[UDC_TASK_STK_SIZE];
 
 void udc_init(void)
 {
-	dprintf("\nCreate UDC task!");
 	OSTaskCreate(udcTaskEntry, (void *)0,
 		     (void *)&udcTaskStack[UDC_TASK_STK_SIZE - 1],
 		     2);
