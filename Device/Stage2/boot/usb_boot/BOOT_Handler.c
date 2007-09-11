@@ -18,7 +18,7 @@ int (*nand_program_oob)(void *context, int spage, int pages, void (*notify)(int)
 int (*nand_erase)(int blk_num, int sblk, int force, void (*notify)(int));
 int (*nand_read)(void *buf, u32 startpage, u32 pagenum,int option);
 int (*nand_read_oob)(void *buf, u32 startpage, u32 pagenum);
-int (*nand_read_raw)(void *buf, u32 startpage, u32 pagenum);
+int (*nand_read_raw)(void *buf, u32 startpage, u32 pagenum,int);
 void (*nand_enable) (unsigned int csn);
 void (*nand_disable) (unsigned int csn);
 
@@ -150,10 +150,21 @@ int NAND_OPS_Handle(u8 *buf)
 		dprintf("\n Request : NAND_READ_RAW!");
 		//temp = ops_length / Hand.nand_ps + 1;
 		//dprintf("\n temp %d",temp);
-		nand_read_raw(Bulk_in_buf,start_addr,ops_length);
-		HW_SendPKT(1,Bulk_in_buf,ops_length*(Hand.nand_ps + Hand.nand_os));
-		handshake_PKT[3]=(u16)ERR_OK;
-		udc_state = BULK_IN;
+		switch (option)
+		{
+		case OOB_ECC:
+			nand_read_raw(Bulk_in_buf,start_addr,ops_length,option);
+			HW_SendPKT(1,Bulk_in_buf,ops_length*(Hand.nand_ps + Hand.nand_os));
+			handshake_PKT[3]=(u16)ERR_OK;
+			udc_state = BULK_IN;
+			break;
+		default:
+			nand_read_raw(Bulk_in_buf,start_addr,ops_length,option);
+			HW_SendPKT(1,Bulk_in_buf,ops_length*Hand.nand_ps);
+			handshake_PKT[3]=(u16)ERR_OK;
+			udc_state = BULK_IN;
+			break;
+		}
 		break;
 	case NAND_ERASE:
 		dprintf("\n Request : NAND_ERASE!");
