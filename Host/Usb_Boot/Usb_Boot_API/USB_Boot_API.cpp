@@ -564,7 +564,7 @@ int API_Boot(int obj)				//：对选中的设备进行Boot操作
 			printf("\n Device have not init!");
 			return -1;
 		}
-
+ 
 		printf("\n Initing No.%d device......",obj);
 		Init_Hand_Def();
 		if (Init_CFG("USBBoot.cfg")==1)
@@ -707,7 +707,7 @@ int API_Nand_Read(NAND_IN *nand_in,char *fname)
 	int i,j;
 	unsigned int start_addr = nand_in->start,length = nand_in->length,page_num;
 	unsigned char csn;
-	ULONG	nRead;
+	unsigned short temp;
 
 		if (Handle_Open(nand_in->dev)==-1)
 		{
@@ -729,13 +729,13 @@ int API_Nand_Read(NAND_IN *nand_in,char *fname)
 			if ((nand_in->cs_map)[i]!=0) break;
 		if (i>=nand_in->max_chip) return 1;
 		csn = i;
-		memset(nand_in->buf,0,page_num * Hand.nand_ps);
+		//memset(nand_in->buf,0,page_num * Hand.nand_ps);
 		printf("\n Reading from No.%d device No.%d flash....",nand_in->dev,csn);
 
 		page_num = length / Hand.nand_ps +1;
 		JZ4740_USB_SET_DATA_ADDRESS(start_addr,hDevice);
 		JZ4740_USB_SET_DATA_LENGTH(page_num,hDevice);
-		unsigned short temp = ((NO_OOB<<12) & 0xf000) + ((csn<<4) & 0xff0) + NAND_READ;
+		temp = ((NO_OOB<<12) & 0xf000) + ((csn<<4) & 0xff0) + NAND_READ;
 		//printf("\n temp %x",temp);
 		JZ4740_USB_NAND_OPS(temp,hDevice);
 		ReadFile(hDevice, nand_in->buf, page_num * Hand.nand_ps, &nRead, NULL);
@@ -779,7 +779,7 @@ int API_Nand_Readoob(NAND_IN *nand_in,char *fname)
 			if ((nand_in->cs_map)[i]!=0) break;
 		if (i>=nand_in->max_chip) return 1;
 		csn = i;
-		memset(nand_in->buf,0,(length/Hand.nand_ps+1) * Hand.nand_ps);
+		//memset(nand_in->buf,0,(length/Hand.nand_ps+1) * Hand.nand_ps);
 		printf("\n Reading OOB from No.%d device No.%d flash....",nand_in->dev,csn);
 
 		page_num = length/Hand.nand_ps+1;
@@ -805,9 +805,9 @@ int API_Nand_Readoob(NAND_IN *nand_in,char *fname)
 int API_Nand_Readraw(NAND_IN *nand_in,char *fname)
 {
 	int i,j;
-	int start_addr = nand_in->start ,length = nand_in->length;
+	unsigned int start_addr = nand_in->start ,length = nand_in->length ,page_num;
 	unsigned char csn;
-	ULONG	nRead;
+	unsigned short temp;
 
 		if (Handle_Open(nand_in->dev)==-1)
 		{
@@ -829,14 +829,15 @@ int API_Nand_Readraw(NAND_IN *nand_in,char *fname)
 			if ((nand_in->cs_map)[i]!=0) break;
 		if (i>=nand_in->max_chip) return 1;
 		csn = i;
-		memset(nand_in->buf,0,(length/Hand.nand_ps+1) * Hand.nand_ps);
+		//memset(nand_in->buf,0,(length/Hand.nand_ps+1) * Hand.nand_ps);
 		printf("\n Reading RAW from No.%d device No.%d flash....",nand_in->dev,csn);
+		page_num = length/Hand.nand_ps +1;
 
 		JZ4740_USB_SET_DATA_ADDRESS(start_addr,hDevice);
-		JZ4740_USB_SET_DATA_LENGTH(length,hDevice);
-		unsigned short temp = ((csn<<4) & 0xff0) + NAND_READ_RAW;
+		JZ4740_USB_SET_DATA_LENGTH(page_num,hDevice);
+		temp = ((NO_OOB<<12) & 0xf000) + ((csn<<4) & 0xff0) + NAND_READ_RAW;
 		JZ4740_USB_NAND_OPS(temp,hDevice);
-		ReadFile(hDevice, nand_in->buf, (length/Hand.nand_ps+1) * Hand.nand_ps, &nRead, NULL);
+		ReadFile(hDevice, nand_in->buf, page_num * Hand.nand_ps, &nRead, NULL);
 
 		for (j=0;j<length;j++) 
 		{
