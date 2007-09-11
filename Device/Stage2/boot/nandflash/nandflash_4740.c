@@ -310,7 +310,7 @@ static int nand_check_block(u32 block)
  * Don't skip bad block.
  * Don't use HW ECC.
  */
-int nand_read_raw_4740(void *buf, u32 startpage, u32 pagenum)
+int nand_read_raw_4740(void *buf, u32 startpage, u32 pagenum,int option)
 {
 	u32 cnt, j;
 	u32 cur_page, rowaddr;
@@ -340,8 +340,12 @@ int nand_read_raw_4740(void *buf, u32 startpage, u32 pagenum)
 		read_proc(tmpbuf, pagesize);
 
 		tmpbuf += pagesize;
+
+		if (option == OOB_ECC)
+		{
 		read_oob(tmpbuf, oobsize, cur_page);
 		tmpbuf += oobsize;
+		}
 
 		cur_page++;
 		cnt++;

@@ -22,7 +22,7 @@ int nand_program_oob_4740(void *context, int spage, int pages, void (*notify)(in
 int nand_erase_4740(int blk_num, int sblk, int force, void (*notify)(int));
 int nand_read_4740(void *buf, u32 startpage, u32 pagenum,int option);
 int nand_read_oob_4740(void *buf, u32 startpage, u32 pagenum);
-int nand_read_raw_4740(void *buf, u32 startpage, u32 pagenum);
+int nand_read_raw_4740(void *buf, u32 startpage, u32 pagenum,int);
 void nand_enable_4740(u32 csn);
 void nand_disable_4740(u32 csn);
 
