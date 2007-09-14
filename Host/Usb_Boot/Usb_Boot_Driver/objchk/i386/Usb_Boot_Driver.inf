@@ -89,7 +89,7 @@ DisplayName    = %SvcDesc%
 ServiceType    = 1                  ; SERVICE_KERNEL_DRIVER
 StartType      = 3                  ; SERVICE_DEMAND_START
 ErrorControl   = 1                  ; SERVICE_ERROR_NORMAL
-ServiceBinary  = %10%\System32\Drivers\jz4740_usb.sys
+ServiceBinary  = %10%\System32\Drivers\Usb_Boot_Driver.sys
 
 [Jz4740_usb_NT_AddReg]
 HKLM, "System\CurrentControlSet\Services\Jz4740_usb\Parameters",\
