@@ -397,14 +397,14 @@ int Handle_Stage1(char *fw,char *usbboot)
 	flen=ftell(fp);
 	fseek(fp,0,SEEK_SET);
 	fread(code_buf,1,flen,fp);
-	if (JZ4740_USB_SET_DATA_ADDRESS(0x82000000,hDevice)!=1) return -1;	//it is ucos
+	if (JZ4740_USB_SET_DATA_ADDRESS(0x82600000,hDevice)!=1) return -1;	//it is ucos
 	WriteFile(hDevice, code_buf, flen, &nWriten, NULL);			//write code_1
 	JZ4740_USB_GET_CPU_INFO(hDevice);
 	JZ4740_USB_FLUSH_CACHES(hDevice);
-	if (JZ4740_USB_PROG_START2(0x82000000,hDevice)!=1) return -1;				//execute code_2 ,now we can do usbboot!
+	if (JZ4740_USB_PROG_START2(0x82600000,hDevice)!=1) return -1;				//execute code_2 ,now we can do usbboot!
 	fclose(fp);
 	return 1;
-}
+} 
 
 int Handle_Stage1_new(char *fw,char *uboot,char *uImage)
 {
@@ -540,6 +540,8 @@ int API_Boot(int obj)				//：对选中的设备进行Boot操作
 		else printf(" UnBooted!");
 
 		if (Handle_Stage1("fw.bin","usb_boot.bin")==-1)
+//		if (Handle_Stage1("fw_16.bin","zImage")==-1)
+//		if (Handle_Stage1("fw_16.bin","fw_15.bin")==-1)
 		{
 			printf("......Boot fail!");
 		}		
@@ -662,7 +664,7 @@ int API_Nand_Program_File(NAND_IN *nand_in,NAND_OUT *nand_out,char *fname)
 				page_num = MAX_TRANSFER_SIZE / (Hand.nand_ps + 64);
 			}
 			code_len = MAX_TRANSFER_SIZE;
-			memset(code_buf,0,code_len);		//set all to null
+//			memset(code_buf,0,code_len);		//set all to null
 			fread(code_buf,1,code_len,fp);			//read code from file to buffer
 
 			printf("\n No.%d Programming......",k+1);
@@ -684,7 +686,7 @@ int API_Nand_Program_File(NAND_IN *nand_in,NAND_OUT *nand_out,char *fname)
 
 		if (j)
 		{
-			memset(code_buf,0,code_len);				//set all to null
+//			memset(code_buf,0,code_len);				//set all to null
 			fread(code_buf,1,j,fp);						//read code from file to buffer
 			nand_in->length = j;
 			nand_in->buf = code_buf;

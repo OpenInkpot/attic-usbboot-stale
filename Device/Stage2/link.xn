@@ -32,7 +32,7 @@ SECTIONS
 {
   /**** Code and read-only data ****/
 
-  .text 0x82000000 :
+  .text 0x82600000 :
   {
     _ftext = ABSOLUTE(.) ;	/* Start of code and read-only data	*/
     *(.text*)
