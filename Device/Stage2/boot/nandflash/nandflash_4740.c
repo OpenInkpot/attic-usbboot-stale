@@ -763,7 +763,8 @@ int nand_program_4740(void *context, int spage, int pages, void (*notify)(int),i
 			for (j = 0; j < ecccnt; j++) {
 				volatile u8 *paraddr = (volatile u8 *)EMC_NFPAR0;
 				int k;
-				
+
+				REG_EMC_NFINTS = 0x0;				
 				__nand_ecc_rs_encoding();
 				write_proc(tmpbuf, ECC_BLOCK);
 				__nand_ecc_encode_sync();
