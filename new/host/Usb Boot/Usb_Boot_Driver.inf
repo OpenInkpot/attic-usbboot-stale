@@ -1,0 +1,118 @@
+;; Jz4740_usb.inf
+
+;; *********  PLEASE READ ***********
+;; The wizard cannot create exact INF files for all buses and device types.
+;; You may have to make changes to this file in order to get your device to
+;; install. In particular, hardware IDs and logical configurations require
+;; intervention.
+;;
+;; The Windows DDK documentation contains an excellent INF reference.
+
+;--------- Version Section ---------------------------------------------------
+
+[Version]
+Signature="$Windows 95$"
+
+; If device fits one of the standard classes, use the name and GUID here,
+; otherwise create your own device class and GUID as this example shows.
+
+Class=NewDeviceClass
+ClassGUID={ff646f80-8def-11d2-9449-00105a075f6b}
+Provider=%ProviderName%
+
+
+;--------- SourceDiskNames and SourceDiskFiles Section -----------------------
+
+; These sections identify source disks and files for installation.  They are
+; shown here as an example, but commented out.
+
+;[SourceDisksNames]
+;1 = "Install Disk",Disk1,,
+
+;[SourceDisksFiles]
+;jz4740_usb.sys = 1,,
+
+;--------- ClassInstall/ClassInstall32 Section -------------------------------
+
+; Not necessary if using a standard class
+
+; 9X Style
+[ClassInstall]
+Addreg=Class_AddReg
+
+; NT Style
+[ClassInstall32]
+Addreg=Class_AddReg
+
+[Class_AddReg]
+HKR,,,,%DeviceClassName%
+HKR,,Icon,,"-18"
+
+;--------- DestinationDirs Section -------------------------------------------
+
+[DestinationDirs]
+Jz4740_usb_Files_Driver = 10,System32\Drivers
+
+;--------- Manufacturer and Models Sections ----------------------------------
+
+[Manufacturer]
+%MfgName%=Mfg0
+
+[Mfg0]
+%DeviceDesc%=Jz4740_usb_DDI, USB\VID_601A&PID_4740
+
+;---------- DDInstall Sections -----------------------------------------------
+; --------- Windows 9X -----------------
+
+; Experimentation has shown that DDInstall root names greater than 19 characters
+; cause problems in Windows 98
+
+[Jz4740_usb_DDI]
+CopyFiles=Jz4740_usb_Files_Driver
+AddReg=Jz4740_usb_9X_AddReg
+
+[Jz4740_usb_9X_AddReg]
+HKR,,DevLoader,,*ntkern
+HKR,,NTMPDriver,,jz4740_usb.sys
+HKR, "Parameters", "BreakOnEntry", 0x00010001, 0
+; --------- Windows NT -----------------
+
+[Jz4740_usb_DDI.NT]
+CopyFiles=Jz4740_usb_Files_Driver
+AddReg=Jz4740_usb_NT_AddReg
+
+[Jz4740_usb_DDI.NT.Services]
+Addservice = Jz4740_usb, 0x00000002, Jz4740_usb_AddService
+
+[Jz4740_usb_AddService]
+DisplayName    = %SvcDesc%
+ServiceType    = 1                  ; SERVICE_KERNEL_DRIVER
+StartType      = 3                  ; SERVICE_DEMAND_START
+ErrorControl   = 1                  ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %10%\System32\Drivers\Usb_Boot_Driver.sys
+
+[Jz4740_usb_NT_AddReg]
+HKLM, "System\CurrentControlSet\Services\Jz4740_usb\Parameters",\
+	"BreakOnEntry", 0x00010001, 0
+
+
+
+; --------- Files (common) -------------
+
+[Jz4740_usb_Files_Driver]
+Usb_Boot_Driver.sys
+
+;--------- Strings Section ---------------------------------------------------
+
+[Strings]
+ProviderName="Ingenic Semiconductor"
+MfgName="Ingenic Semiconductor"
+DeviceDesc="Usb_Boot_Device"
+DeviceClassName="Usb_Boot_Tool"
+SvcDesc="Usb_Boot_Tool"
+
+;ProviderName="Your Company Name here"
+;MfgName="Name of HW Manufacturer here"
+;DeviceDesc="Description of Device here"
+;DeviceClassName="Description of Jz4740_usb Device class here"
+;SvcDesc="Description of Jz4740_usb NT service here"
