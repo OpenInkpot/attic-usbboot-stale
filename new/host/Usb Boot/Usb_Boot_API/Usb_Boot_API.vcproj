@@ -19,7 +19,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="$(DRIVERWORKS)\include,$(CRT_INC_PATH)"
+				AdditionalIncludeDirectories="..\Usb_Boot_Driver;&quot;$(DRIVERWORKS)\include&quot;;&quot;$(CRT_INC_PATH)&quot;"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;WIN32_LEAN_AND_MEAN"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="0"

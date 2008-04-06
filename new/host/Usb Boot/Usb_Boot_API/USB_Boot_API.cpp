@@ -10,8 +10,8 @@
 #include <stdio.h>
 #include <windows.h>
 #include <winioctl.h>
-#include "..\Usb_Boot_Driver\Usb_Boot_Interface.h" 
-#include "..\Usb_Boot_Driver\Usb_Boot_Ioctl.h"	   
+#include "Usb_Boot_Interface.h" 
+#include "Usb_Boot_Ioctl.h"	   
 #include "Usb_Boot_defines.h"
 #include "USB_Boot_API.h"
  
@@ -464,74 +464,6 @@ int Handle_Stage1(char *fw,char *usbboot)
 	return 1;
 } 
 
-int Handle_Stage1_new(char *fw,char *uboot,char *uImage)
-{
-	FILE *fp;
-	unsigned int flen;
-	ULONG nWriten;
-
-	if ((fp=fopen(fw,"rb"))==NULL)
-	{
-		printf("\n Can not open file :%s",fw);
-		return 0;
-	}
-	//fread(code_buf,1,flen,fp);
-	fseek(fp,0,SEEK_END);
-	flen=ftell(fp);
-	if (flen>16384)
-	{
-		printf("\n Cache file is too large!");
-		return 0;
-	}
-	fseek(fp,0,SEEK_SET);
-	fread(code_buf,1,flen,fp);
-	JZ4740_USB_GET_CPU_INFO(hDevice);
-	if (JZ4740_USB_SET_DATA_ADDRESS(0x80000000,hDevice)!=1) return -1;
-	WriteFile(hDevice, code_buf, flen, &nWriten, NULL);			//write code_1
-	//WriteFile(hDevice, fw1, sizeof(fw1), &nWriten, NULL);			//write code_1
-	if (JZ4740_USB_PROG_START1(0x80000000,hDevice)!=1) return -1;	//execute code_1 ,init SDRAM
-	wait_delay = 0x7ffffff;
-	while(wait_delay--);											//wait for return
-	JZ4740_USB_GET_CPU_INFO(hDevice);
-	fclose(fp);
-
-	if ((fp=fopen(uboot,"rb"))==NULL)
-	{
-		printf("\n Can not open file :%s",uboot);
-		return 0;
-	}
-	//fread(code_buf,1,flen,fp);
-	fseek(fp,0,SEEK_END);
-	flen=ftell(fp);
-	fseek(fp,0x20000,SEEK_SET);
-	fread(code_buf,1,0x20000,fp);
-	if (JZ4740_USB_SET_DATA_ADDRESS(0x80100000,hDevice)!=1) return -1;	//it is ucos
-	WriteFile(hDevice, code_buf, 0x20000, &nWriten, NULL);			//write code_1
-	JZ4740_USB_GET_CPU_INFO(hDevice);
-	JZ4740_USB_FLUSH_CACHES(hDevice);
-	//if (JZ4740_USB_PROG_START2(0x80100000,hDevice)!=1) return -1;				//execute code_2 ,now we can do usbboot!
-	fclose(fp);
-
-	if ((fp=fopen(uImage,"rb"))==NULL)
-	{
-		printf("\n Can not open file :%s",uImage);
-		return 0;
-	}
-	//fread(code_buf,1,flen,fp);
-	fseek(fp,0,SEEK_END);
-	flen=ftell(fp);
-	fseek(fp,0,SEEK_SET);
-	fread(code_buf,1,flen,fp);
-	if (JZ4740_USB_SET_DATA_ADDRESS(0x80600000,hDevice)!=1) return -1;	//it is ucos
-	WriteFile(hDevice, code_buf, flen, &nWriten, NULL);			//write code_1
-	JZ4740_USB_GET_CPU_INFO(hDevice);
-	JZ4740_USB_FLUSH_CACHES(hDevice);
-	if (JZ4740_USB_PROG_START2(0x80100000,hDevice)!=1) return -1;				//execute code_2 ,now we can do usbboot!
-	fclose(fp);
-	return 1;
-}
-
-
 int API_Init()
 {
 	Init_Hand_Def();
@@ -553,30 +485,9 @@ int API_Get_Dev_Num()		//：获取当前已经连接的设备个数
 			j++;
 			Handle_Close();
 		}
-	/*hDevice = OpenByInterface(&ClassGuid, 0, &Error);
-	if (hDevice == INVALID_HANDLE_VALUE) return 0;
-	else 
-	{
-		i=JZ4740_USB_GET_NUM(hDevice);
-		return i;
-	}
-	return 1;*/
+
 	return j;
 }
-
-/*int API_Select(int obj)		//：选中编号为obj的设备为操作对象
-{
-	if (obj>=MAX_DEV_NUM) return -1;
-	dev_data[obj].op = 1;
-	return 1;
-}
-
-int API_UnSelect(int obj)		//：取消对编号为obj的对象的选择
-{
-	if (obj>=MAX_DEV_NUM) return -1;
-	dev_data[obj].op = 0;
-	return 1;
-}*/
 
 //操作类API:
 int API_Boot(int obj)				//：对选中的设备进行Boot操作
@@ -598,8 +509,6 @@ int API_Boot(int obj)				//：对选中的设备进行Boot操作
 		else printf("UnBooted");
 
 		if (Handle_Stage1("fw.bin","usb_boot.bin")==-1)
-//		if (Handle_Stage1("fw.bin","zImage")==-1)
-//		if (Handle_Stage1("fw_16.bin","fw_15.bin")==-1)
 		{
 			printf("......Boot fail");
 		}		
@@ -609,9 +518,6 @@ int API_Boot(int obj)				//：对选中的设备进行Boot操作
 		{
 			wait_delay = 0xffffff;
 			while(wait_delay--);											//wait for return
-//			wait_delay = 0xfffffff;
-//			while(wait_delay--);											//wait for return
-
 			if (Handle_Open(obj)==-1) printf("\n Retrying reconnect with device %d",retry);
 			else 
 			{
@@ -694,9 +600,20 @@ int API_Nand_Program_File(NAND_IN *nand_in,NAND_OUT *nand_out,char *fname)
 		flen=ftell(fp);
 		n_in.start = nand_in->start /Hand.nand_ppb; 
 		if (nand_in->option == NO_OOB)
-			n_in.length = (flen /Hand.nand_ps) /Hand.nand_ppb +1;
+		{
+			if ( flen % ( Hand.nand_ppb * Hand.nand_ps ) == 0 ) 
+				n_in.length = flen / ( Hand.nand_ps * Hand.nand_ppb );
+			else
+				n_in.length = flen / ( Hand.nand_ps * Hand.nand_ppb ) + 1;
+		}
 		else 
-			n_in.length = (flen /(Hand.nand_ps + Hand.nand_os)) /Hand.nand_ppb +1;
+		{
+			if ( flen % ( Hand.nand_ppb * Hand.nand_ps ) == 0 ) 
+				n_in.length = flen / ( (Hand.nand_ps + Hand.nand_os) * Hand.nand_ppb );
+			else
+				n_in.length = flen / ( (Hand.nand_ps + Hand.nand_os) * Hand.nand_ppb ) + 1;
+		}
+		//printf(" length %d flen %d \n",n_in.length,flen);
 		n_in.cs_map = nand_in->cs_map;
 		n_in.dev = nand_in->dev;
 		n_in.max_chip = nand_in->max_chip;
