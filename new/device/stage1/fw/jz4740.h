@@ -21,7 +21,7 @@ typedef unsigned int u32;
 #include <cacheops.h>
 #define KSEG0 KSEG0BASE
 #else
-#include <asm/addrspace.h>
+//#include <asm/addrspace.h>
 #include <asm/cacheops.h>
 #endif
 
