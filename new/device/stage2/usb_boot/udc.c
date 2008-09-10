@@ -2,7 +2,7 @@
 #include "usb.h"
 #include "udc.h"
 #include "usb_boot.h"
-#include "mipsregs.h"
+//#include "mipsregs.h"
 
 #define dprintf(x...) 
 //printf(x)

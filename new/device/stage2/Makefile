@@ -46,7 +46,6 @@ all:	$(APP)
 	$(OBJDUMP) -D $(APP) > $(TARGET).dump
 	$(NM) $(APP) | sort > $(TARGET).sym
 	$(OBJDUMP) -h $(APP) > $(TARGET).map
-	cp $(TARGET).bin /tftpboot/yliu
 
 $(APP):	$(HEADO) $(OBJS) $(EXTLIBS) 
 	$(LD) $(LDFLAGS) $^ -o $@
