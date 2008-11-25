@@ -1,6 +1,6 @@
 /* USB_BOOT Handle routines*/
 
-#include "jz4740.h"
+#include"jz4740.h"
 #include "usb.h" 
 #include "error.h"
 //#include "flash.h"
@@ -11,12 +11,11 @@
 #define dprintf(x) serial_puts(x)
 //printf(x)
 
-unsigned int (*nand_query)(void);
+unsigned int (*nand_query)(u8 *);
 int (*nand_init)(int bus_width, int row_cycle, int page_size, int page_per_block,
 		 int,int,int,int);
 int (*nand_fini)(void);
 u32 (*nand_program)(void *context, int spage, int pages,int option);
-//int (*nand_program_oob)(void *context, int spage, int pages, void (*notify)(int));
 u32 (*nand_erase)(int blk_num, int sblk, int force);
 u32 (*nand_read)(void *buf, u32 startpage, u32 pagenum,int option);
 u32 (*nand_read_oob)(void *buf, u32 startpage, u32 pagenum);
@@ -41,10 +40,20 @@ void config_flash_info()
 {
 }
 
+void dump_data(unsigned int *p, int size)
+{
+	int i;
+	for(i = 0; i < size; i ++)
+		serial_put_hex(*p++);
+}
+
 void config_hand()
 {
 	hand_t *hand_p;
 	hand_p=( hand_t *)Bulk_out_buf;
+	memcpy( &Hand, (unsigned char *)Bulk_out_buf, sizeof(hand_t));
+
+#if 0
 	Hand.nand_bw=hand_p->nand_bw;
 	Hand.nand_rc=hand_p->nand_rc;
 	Hand.nand_ps=hand_p->nand_ps;
@@ -56,22 +65,30 @@ void config_hand()
 	Hand.nand_eccpos=hand_p->nand_eccpos;
 	Hand.nand_bbpos=hand_p->nand_bbpos;
 	Hand.nand_bbpage=hand_p->nand_bbpage;
+//	memcpy( &Hand.fw_args, (unsigned char *)(start_addr + 0x8), 32 );
+
 //	serial_putc(Hand.nand_eccpos + 48);
 //	serial_putc(Hand.nand_bbpos + 48);
 //	serial_putc(Hand.nand_bbpage + 48);
 //	dprintf("\n Hand : bw %d rc %d ps %d ppb %d erase %d pn %d os %d",
 //		Hand.nand_bw,Hand.nand_rc,Hand.nand_ps,Hand.nand_ppb,Hand.nand_force_erase,Hand.nand_pn,Hand.nand_os);
+	serial_put_hex(Hand.fw_args.cpu_id);
+	serial_put_hex(Hand.fw_args.ext_clk);
+#endif
 }
 
 int GET_CUP_INFO_Handle()
 {
-	char temp[8]="BOOTED!!";
+	char temp1[8]="Boot4740",temp2[8]="Boot4750";
 //	dprintf("\n GET_CPU_INFO!");
-	HW_SendPKT(0,temp,8);
+	if ( Hand.fw_args.cpu_id == 0x4740 )
+		HW_SendPKT(0,temp1,8);
+	else
+		HW_SendPKT(0,temp2,8);
 	udc_state = IDLE;
 	return ERR_OK; 
 }
-	      
+	       
 int SET_DATA_ADDERSS_Handle(u8 *buf)
 {
 	USB_DeviceRequest *dreq = (USB_DeviceRequest *)buf;
@@ -136,8 +153,8 @@ int NAND_OPS_Handle(u8 *buf)
 	{
 	case NAND_QUERY:
 		dprintf("\n Request : NAND_QUERY!");
-		temp=nand_query();
-		HW_SendPKT(1,(u8 *)&temp,4);
+		nand_query(Bulk_in_buf);
+		HW_SendPKT(1, Bulk_in_buf, 8);
 		handshake_PKT[3]=(u16)ERR_OK;
 		udc_state = BULK_IN;
 		break;
@@ -198,21 +215,21 @@ int NAND_OPS_Handle(u8 *buf)
 		switch (option)
 		{
 		case 	OOB_ECC:
-			ret_dat = nand_read_4740(Bulk_in_buf,start_addr,ops_length,OOB_ECC);
+			ret_dat = nand_read(Bulk_in_buf,start_addr,ops_length,OOB_ECC);
 			handshake_PKT[0] = (u16) ret_dat;
 			handshake_PKT[1] = (u16) (ret_dat>>16);
 			HW_SendPKT(1,(u8 *)Bulk_in_buf,ops_length*(Hand.nand_ps + Hand.nand_os ));
 			udc_state = BULK_IN;
 			break;
 		case 	OOB_NO_ECC:
-			ret_dat = nand_read_4740(Bulk_in_buf,start_addr,ops_length,OOB_NO_ECC);
+			ret_dat = nand_read(Bulk_in_buf,start_addr,ops_length,OOB_NO_ECC);
 			handshake_PKT[0] = (u16) ret_dat;
 			handshake_PKT[1] = (u16) (ret_dat>>16);
 			HW_SendPKT(1,(u8 *)Bulk_in_buf,ops_length*(Hand.nand_ps + Hand.nand_os ));
 			udc_state = BULK_IN;
 			break;
 		case 	NO_OOB:
-			ret_dat = nand_read_4740(Bulk_in_buf,start_addr,ops_length,NO_OOB);
+			ret_dat = nand_read(Bulk_in_buf,start_addr,ops_length,NO_OOB);
 			handshake_PKT[0] = (u16) ret_dat;
 			handshake_PKT[1] = (u16) (ret_dat>>16);
 			HW_SendPKT(1,(u8 *)Bulk_in_buf,ops_length*Hand.nand_ps);
@@ -272,19 +289,43 @@ int SDRAM_OPS_Handle(u8 *buf)
 void Borad_Init()
 {
 	dprintf("\n Borad_init! ");
-	//Init nand flash
-	nand_init_4740(Hand.nand_bw,Hand.nand_rc,Hand.nand_ps,Hand.nand_ppb,
+	serial_put_hex(Hand.fw_args.cpu_id);
+	switch (Hand.fw_args.cpu_id)
+	{
+	case 0x4740:
+		//Init nand flash
+		nand_init_4740(Hand.nand_bw,Hand.nand_rc,Hand.nand_ps,Hand.nand_ppb,
 		       Hand.nand_bbpage,Hand.nand_bbpos,Hand.nand_force_erase,Hand.nand_eccpos);
+	
+		nand_program=nand_program_4740;
+		nand_erase  =nand_erase_4740;
+		nand_read   =nand_read_4740;
+		nand_read_oob=nand_read_oob_4740;
+		nand_read_raw=nand_read_raw_4740;
+		nand_query  = nand_query_4740;
+		nand_enable = nand_enable_4740;
+		nand_disable= nand_disable_4740;
+		nand_mark_bad = nand_mark_bad_4740;
+	break;
+	case 0x4750:
+		//Init nand flash
+		nand_init_4750(Hand.nand_bw, Hand.nand_rc, Hand.nand_ps,
+			       Hand.nand_ppb, Hand.nand_bchbit, Hand.nand_eccpos,
+			       Hand.nand_bbpos, Hand.nand_bbpage, Hand.nand_force_erase);
 
-	nand_program=nand_program_4740;
-	nand_erase  =nand_erase_4740;
-	nand_read   =nand_read_4740;
-	nand_read_oob=nand_read_oob_4740;
-	nand_read_raw=nand_read_raw_4740;
-	nand_query  = nand_query_4740;
-	nand_enable = nand_enable_4740;
-	nand_disable= nand_disable_4740;
-	nand_mark_bad = nand_mark_bad_4740;
+		nand_program=nand_program_4750;
+		nand_erase  =nand_erase_4750;
+		nand_read   =nand_read_4750;
+		nand_read_oob=nand_read_oob_4750;
+		nand_read_raw=nand_read_raw_4750;
+		nand_query  = nand_query_4750;
+		nand_enable = nand_enable_4750;
+		nand_disable= nand_disable_4750;
+		nand_mark_bad = nand_mark_bad_4750;
+	break;
+	default:
+		serial_puts("Not support CPU ID!");
+	}
 }
 
 int CONFIGRATION_Handle(u8 *buf)

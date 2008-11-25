@@ -4,7 +4,8 @@
 #include "usb_boot.h"
 //#include "mipsregs.h"
 
-#define dprintf(x...) 
+#define dprintf(x...)  
+//serial_puts(x)
 //printf(x)
 #define TXFIFOEP0 USB_FIFO_EP0
 
@@ -79,7 +80,7 @@ static void udcWriteFifo(u8 *ptr, int size)
 
 void HW_SendPKT(int ep, const u8 *buf, int size)
 {
-	dprintf("EP%d send pkt :%d\n", ep, size);
+//	dprintf("EP%d send pkt :%d\n", ep, size);
 	fifo = fifoaddr[ep];
 
 	if (ep!=0)
@@ -112,7 +113,7 @@ void HW_SendPKT(int ep, const u8 *buf, int size)
 
 void HW_GetPKT(int ep, const u8 *buf, int size)
 {
-	dprintf("EP%d read pkt :%d\n", ep, size);
+//	dprintf("EP%d read pkt :%d\n", ep, size);
 	memcpy((void *)buf, (u8 *)rx_buf, size);
 	fifo = fifoaddr[ep];
 	if (rx_size > size)
@@ -209,7 +210,7 @@ void sendDevDescString(int size)
 		   0x0030,
 		   0x0030
 		  };
-	dprintf("sendDevDescString size = %d\r\n",size);
+//	dprintf("sendDevDescString size = %d\r\n",size);
 	if(size >= 26)
 		size = 26;
 	str_ret[0] = (0x0300 | size);
@@ -268,7 +269,7 @@ static void udc_reset(void)
 //	REG_CPM_SCR |= CPM_SCR_USBPHY_ENABLE;
 	/* Disable interrupts */
 	byte=jz_readb(USB_REG_POWER);
-	dprintf("\nREG_POWER: %02x",byte);
+//	dprintf("\nREG_POWER: %02x",byte);
 	jz_writew(USB_REG_INTRINE, 0);
 	jz_writew(USB_REG_INTROUTE, 0);
 	jz_writeb(USB_REG_INTRUSBE, 0);
@@ -287,7 +288,7 @@ static void udc_reset(void)
 	jz_writeb(USB_REG_INTRUSBE,0x4);
 
 	byte=jz_readb(USB_REG_POWER);
-	dprintf("\nREG_POWER: %02x",byte);
+//	dprintf("\nREG_POWER: %02x",byte);
 	if ((byte&0x10)==0) 
 	{
 		jz_writeb(USB_REG_INDEX,1);
@@ -431,7 +432,7 @@ void Handshake_PKT()
 
 void usbHandleDevReq(u8 *buf)
 {
-	dprintf("dev req:%d\n", (buf[0] & (3 << 5)) >> 5);
+//	dprintf("dev req:%d\n", (buf[0] & (3 << 5)) >> 5);
 	switch ((buf[0] & (3 << 5)) >> 5) {
 	case 0: /* Standard request */
 		usbHandleStandDevReq(buf);
@@ -480,6 +481,7 @@ void EP0_Handler ()
 			udcReadFifo((u8 *)rx_buf, sizeof(USB_DeviceRequest));
 			usb_setb(USB_REG_CSR0, 0x48);//clear OUTRD bit
 			dreq = (USB_DeviceRequest *)rx_buf;
+#if 0
 			dprintf("\nbmRequestType:%02x\nbRequest:%02x\n"
 				"wValue:%04x\nwIndex:%04x\n"
 				"wLength:%04x\n",
@@ -488,6 +490,7 @@ void EP0_Handler ()
 				dreq->wValue,
 				dreq->wIndex,
 				dreq->wLength);
+#endif
 			usbHandleDevReq((u8 *)rx_buf);
 		} else 
 		{
@@ -557,46 +560,50 @@ void EPOUT_Handler(u8 EP)
 
 void udc4740Proc ()
 {
-	u8	IntrUSB;
-	u16	IntrIn;
-	u16	IntrOut;
+	volatile u8	IntrUSB;
+	volatile u16	IntrIn;
+	volatile u16	IntrOut;
 /* Read interrupt registers */
-	IntrUSB = jz_readb(USB_REG_INTRUSB);
-	IntrIn  = jz_readw(USB_REG_INTRIN);
-	IntrOut = jz_readw(USB_REG_INTROUT);
-
-	if ( IntrUSB == 0 && IntrIn == 0 && IntrOut == 0)
-		return;
-
-	if (IntrIn & 2) 
-	{
-		dprintf("\nUDC EP1 IN operation!");
-		EPIN_Handler(1);	     
-	}
-	if (IntrOut & 2) 
-	{
-		dprintf("\nUDC EP1 OUT operation!");
-		EPOUT_Handler(1);
-	}
-	if (IntrUSB & USB_INTR_RESET) 
-	{
-		dprintf("\nUDC reset intrupt!");  
-		udc_reset();
-	}
-
+//	while(1)
+//	{
+		IntrUSB = jz_readb(USB_REG_INTRUSB);
+		IntrIn  = jz_readw(USB_REG_INTRIN);
+		IntrOut = jz_readw(USB_REG_INTROUT);
+		
+		if ( IntrUSB == 0 && IntrIn == 0 && IntrOut == 0)
+			return;
+		
+		if (IntrIn & 2) 
+		{
+			dprintf("\nUDC EP1 IN operation!");
+			EPIN_Handler(1);	     
+		}
+		if (IntrOut & 2) 
+		{
+			dprintf("\nUDC EP1 OUT operation!");
+			EPOUT_Handler(1);
+		}
+		if (IntrUSB & USB_INTR_RESET) 
+		{
+			dprintf("\nUDC reset intrupt!");  
+			udc_reset();
+		}
+		
 /* Check for endpoint 0 interrupt */
-	if (IntrIn & USB_INTR_EP0) 
-	{
-		dprintf("\nUDC EP0 operations!");
-		EP0_Handler();
-	}
+		if (IntrIn & USB_INTR_EP0) 
+		{
+			dprintf("\nUDC EP0 operations!");
+			EP0_Handler();
+		}
 
-	IntrIn  = jz_readw(USB_REG_INTRIN);
+		if (USB_Version == USB_FS)
+			IntrIn  = jz_readw(USB_REG_INTRIN);
+//	}
 	return;
 }
 
-unsigned int g_stack[2049];
-void c_main()
+//unsigned int g_stack[2049];
+void usb_main()
 {
 	u8 byte;
 

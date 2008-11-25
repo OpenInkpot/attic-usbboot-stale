@@ -3,38 +3,35 @@
  *
  * Entry point of the firmware.
  * The firmware code are executed in the ICache.
- *
+ * Do not edit!
  * Copyright (C) 2006 Ingenic Semiconductor Inc.
  *
  */
 
 	.text
 	.extern c_main
-	
+		
 	.globl _start
 	.set noreorder
 _start:
+	b	real_start
+	nop
+	.word	0x0                  //	its address == start address + 8
+	.word	0x0
+	.word	0x0
+	.word	0x0
+	.word	0x0
+	.word	0x0
+	.word	0x0
+	.word	0x0
 
-	//----------------------------------------------------
-	// Init CP0 registers
-	//----------------------------------------------------
-	mtc0	$0, $18			// CP0_WATCHLO
-	mtc0	$0, $19			// CP0_WATCHHI
-
-	li	$8, 0x0040FC04
-	mtc0	$8, $12			// CP0_STATUS
-
-	li	$9, 0x00800000		// IV=1, clear cause
-	mtc0	$9, $13			// CP0_CAUSE
-
-
+real_start:	
 	//----------------------------------------------------
 	// setup stack, jump to C code
 	//----------------------------------------------------
-	//la	$29, 0x80004000		// sp
-	la	$29, 0x81ffe000		// sp
-	//	la	$0, c_main
-	j	c_main
+	add	$29, $20, 0x3ffff0      // sp locate at start address offset 0x2ffff0
+	add	$25, $20, 0x40          // t9 = usb_main()
+	j	$25
 	nop
 
 	.set reorder

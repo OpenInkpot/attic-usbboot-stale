@@ -1,6 +1,7 @@
 #include "nandflash.h"
 #include "jz4740.h"
 #include "usb_boot.h"
+#include "hand.h"
 
 #define __nand_enable()		(REG_EMC_NFCSR |= EMC_NFCSR_NFE1 | EMC_NFCSR_NFCE1)
 #define __nand_disable()	(REG_EMC_NFCSR &= ~(EMC_NFCSR_NFCE1))
@@ -47,9 +48,9 @@ static volatile unsigned char *dataport = (volatile unsigned char *)0xb8000000;
 static volatile unsigned char *cmdport = (volatile unsigned char *)0xb8008000;
 
 static int bus = 8, row = 2, pagesize = 2048, oobsize = 64, ppb = 128;
-static int bad_block_pos,bad_block_page,force_erase,ecc_pos;
-
-static u8 data_buf[2048] = {0};
+static int bad_block_pos,bad_block_page,force_erase,ecc_pos,wp_pin;
+extern hand_t Hand;
+//static u8 data_buf[2048] = {0};
 static u8 oob_buf[128] = {0};
 
 #define dprintf(x) serial_puts(x)
@@ -95,18 +96,19 @@ inline void nand_disable_4740(unsigned int csn)
 	__nand_disable();
 }
 
-unsigned int nand_query_4740(void)
+unsigned int nand_query_4740(u8 *id)
 {
-	u16 vid, did;
-
 	__nand_sync();
 	__nand_cmd(CMD_READID);
 	__nand_addr(0);
 
-	vid = __nand_data8();
-	did = __nand_data8();
+	id[0] = __nand_data8();      //VID
+	id[1] = __nand_data8();      //PID
+	id[2] = __nand_data8();      //CHIP ID
+	id[3] = __nand_data8();      //PAGE ID
+	id[4] = __nand_data8();      //PLANE ID
 
-	return (vid << 16) | did;
+	return 0;
 }
 
 int nand_init_4740(int bus_width, int row_cycle, int page_size, int page_per_block,
@@ -121,13 +123,14 @@ int nand_init_4740(int bus_width, int row_cycle, int page_size, int page_per_blo
 	bad_block_page = bbpage;
 	force_erase = force;
 	ecc_pos = ep;
+	wp_pin = Hand.nand_wppin;
 
 //	nand_enable(0);
 	/* Initialize NAND Flash Pins */
 	nand_init_gpio();
-	REG_EMC_SMCR1 = 0x0fff7700;      //optimize speed???
-//	REG_EMC_SMCR1 = 0x04444400;      //optimize speed???
-//	REG_EMC_SMCR1 = 0x022e2200;      //optimize speed???
+//	REG_EMC_SMCR1 = 0x0fff7700;      //slow speed
+	REG_EMC_SMCR1 = 0x04444400;      //normal speed
+//	REG_EMC_SMCR1 = 0x0d221200;      //fast speed
 
 
 	if (bus == 8) {
@@ -162,7 +165,6 @@ u32 nand_read_oob_4740(void *buf, u32 startpage, u32 pagenum)
 	cnt = 0;
 	while (cnt < pagenum) {
 		read_oob((void *)tmpbuf, oobsize, cur_page);
-
 		tmpbuf += oobsize;
 		cur_page++;
 		cnt++;
@@ -229,7 +231,7 @@ static int nand_check_block(u32 block)
  * Don't skip bad block.
  * Don't use HW ECC.
  */
-u32 nand_read_raw_4740(void *buf, u32 startpage, u32 pagenum,int option)
+u32 nand_read_raw_4740(void *buf, u32 startpage, u32 pagenum, int option)
 {
 	u32 cnt, j;
 	u32 cur_page, rowaddr;
@@ -250,7 +252,7 @@ u32 nand_read_raw_4740(void *buf, u32 startpage, u32 pagenum,int option)
 
 		__nand_cmd(CMD_READA);
 		__nand_addr(0);
-		if (pagesize == 2048)
+		if (pagesize != 512)
 			__nand_addr(0);
 
 		rowaddr = cur_page;
@@ -259,14 +261,13 @@ u32 nand_read_raw_4740(void *buf, u32 startpage, u32 pagenum,int option)
 			rowaddr >>= 8;
 		}
 
-		if (pagesize == 2048)
+		if (pagesize != 512)
 			__nand_cmd(CMD_CONFIRM);
 
 		__nand_sync();
 		read_proc(tmpbuf, pagesize);
 
 		tmpbuf += pagesize;
-
 		if (option != NO_OOB)
 		{
 			read_oob(tmpbuf, oobsize, cur_page);
@@ -285,6 +286,8 @@ u32 nand_erase_4740(int blk_num, int sblk, int force)
 	int i, j;
 	u32 cur, rowaddr;
 
+	if (wp_pin)
+		__gpio_set_pin(wp_pin);
 	cur = sblk * ppb;
 	for (i = 0; i < blk_num; ) {
 		rowaddr = cur;
@@ -293,6 +296,7 @@ u32 nand_erase_4740(int blk_num, int sblk, int force)
 			if (nand_check_block(cur/ppb))
 			{
 				cur += ppb;
+				blk_num += (Hand.nand_plane - 1);
 				continue;
 			}
 		}
@@ -307,12 +311,20 @@ u32 nand_erase_4740(int blk_num, int sblk, int force)
 		__nand_sync();
 		__nand_cmd(CMD_READ_STATUS);
 
-		if (__nand_data8() & 0x01) ;
-
+		if (__nand_data8() & 0x01) 
+		{
+			serial_puts("Skip a abs block\n");
+			nand_mark_bad_4740(cur/ppb);
+			cur += ppb;
+			blk_num += (Hand.nand_plane - 1);
+			continue;
+		}
 		cur += ppb;
 		i++;
 	}
 
+	if (wp_pin)
+		__gpio_clear_pin(wp_pin);
 	return cur;
 }
 
@@ -354,6 +366,8 @@ static int read_oob(void *buf, u32 size, u32 pg)
 	/* Read oob data */
 	read_proc(buf, size);
 
+	if (pagesize == 512)
+		__nand_disable();
 	return 0;
 }
 
@@ -385,15 +399,15 @@ void rs_correct(unsigned char *buf, int idx, int mask)
  * Skip bad block if detected.
  * HW ECC is used.
  */
-u32 nand_read_4740(void *buf, u32 startpage, u32 pagenum,int option)
+u32 nand_read_4740(void *buf, u32 startpage, u32 pagenum, int option)
 {
 	u32 j, k;
 	u32 cur_page, cur_blk, cnt, rowaddr, ecccnt;
-	u8 *tmpbuf,*p;
+	u8 *tmpbuf;
 	ecccnt = pagesize / ECC_BLOCK;
-	
 	cur_page = startpage;
 	cnt = 0;
+	tmpbuf = buf;
 
 	while (cnt < pagenum) {
 		/* If this is the first page of the block, check for bad. */
@@ -404,13 +418,12 @@ u32 nand_read_4740(void *buf, u32 startpage, u32 pagenum,int option)
 				continue;
 			}
 		}
-	
 		/* read oob first */
 		read_oob(oob_buf, oobsize, cur_page);
 		__nand_cmd(CMD_READA);
 
 		__nand_addr(0);
-		if (pagesize == 2048)
+		if (pagesize != 512)
 			__nand_addr(0);
 
 		rowaddr = cur_page;
@@ -419,11 +432,10 @@ u32 nand_read_4740(void *buf, u32 startpage, u32 pagenum,int option)
 			rowaddr >>= 8;
 		}
 
-		if (pagesize == 2048)
+		if (pagesize != 512)
 			__nand_cmd(CMD_CONFIRM);
 
 		__nand_sync();
-		tmpbuf = (u8 *)data_buf;
 
 		for (j = 0; j < ecccnt; j++) {
 			volatile u8 *paraddr = (volatile u8 *)EMC_NFPAR0;
@@ -468,26 +480,18 @@ u32 nand_read_4740(void *buf, u32 startpage, u32 pagenum,int option)
 		switch (option)
 		{
 		case	OOB_ECC:
-			tmpbuf = (u8 *)((u32)buf + cnt * (pagesize + oobsize));
-			p = (u8 *)data_buf;
-			for (j = 0; j < pagesize; j++)
-				tmpbuf[j] = p[j];
 			for (j = 0; j < oobsize; j++)
-				tmpbuf[pagesize+j] = oob_buf[j];
+				tmpbuf[j] = oob_buf[j];
+			tmpbuf += oobsize;
 			break;
 		case	OOB_NO_ECC:
-			tmpbuf = (u8 *)((u32)buf + cnt * (pagesize + oobsize));
-			p = (u8 *)data_buf;
-			for (j = 0; j < pagesize + oobsize; j++)
-				tmpbuf[j] = p[j];
 			for (j = 0; j < ECC_SIZE; j++)
-				tmpbuf[pagesize + ecc_pos + j] = 0xff;
+				oob_buf[ecc_pos + j] = 0xff;
+			for (j = 0; j < oobsize; j++)
+				tmpbuf[j] = oob_buf[j];
+			tmpbuf += oobsize;
 			break;
 		case	NO_OOB:
-			tmpbuf = (u8 *)((u32)buf + cnt * pagesize);
-			p = (u8 *)data_buf;
-			for (j = 0; j < pagesize; j++)
-				tmpbuf[j] = p[j];
 			break;
 		}
 
@@ -501,16 +505,33 @@ u32 nand_program_4740(void *context, int spage, int pages, int option)
 {
 	u32 i, j, cur, rowaddr;
 	u8 *tmpbuf;
-	u32 ecccnt;
-	u8 ecc_buf[64];
+	u32 ecccnt,oobsize_sav,ecccnt_sav;
+	u8 ecc_buf[128];
 
+	if (wp_pin)
+		__gpio_set_pin(wp_pin);
+restart:
 	tmpbuf = (u8 *)context;
-	ecccnt = pagesize / ECC_BLOCK;
-
+	ecccnt_sav = ecccnt = pagesize / ECC_BLOCK;
+	oobsize_sav = oobsize;
 	i = 0;
 	cur = spage;
 
 	while (i < pages) {
+#if 1
+		if ((pagesize == 4096) && (cur < 8)) {
+			ecccnt = 4;
+			oobsize = 64;
+		} else {
+			ecccnt = ecccnt_sav;
+			oobsize = oobsize_sav;
+		}
+
+                /* Skip 16KB after nand_spl if pagesize=4096 */
+		if ((pagesize == 4096) && (cur == 8))
+			tmpbuf += 16 * 1024;
+#endif
+
 		if ((cur % ppb) == 0) {
 			if (nand_check_block(cur / ppb)) {
 				cur += ppb;   // Bad block, set to next block 
@@ -520,13 +541,12 @@ u32 nand_program_4740(void *context, int spage, int pages, int option)
 
 		if ( option != NO_OOB )      //if NO_OOB do not perform vaild check!
 		{
-			for ( j = 0 ; j < oobsize ; j ++)
+			for ( j = 0 ; j < pagesize + oobsize; j ++)
 			{
-				if (tmpbuf[j + pagesize ]!=0xff)
+				if (tmpbuf[j] != 0xff)
 					break;
 			}
-			
-			if ( j == oobsize ) 
+			if ( j == oobsize + pagesize ) 
 			{
 				tmpbuf += ( pagesize + oobsize ) ;
 				i ++;
@@ -535,11 +555,15 @@ u32 nand_program_4740(void *context, int spage, int pages, int option)
 			}
 		}
 
+		if (pagesize == 512)
+			__nand_cmd(CMD_READA);
+
 		__nand_cmd(CMD_SEQIN);
 		__nand_addr(0);
 
-		if (pagesize == 2048)
+		if (pagesize != 512)
 			__nand_addr(0);
+
 		rowaddr = cur;
 		for (j = 0; j < row; j++) {
 			__nand_addr(rowaddr & 0xff);
@@ -624,27 +648,39 @@ u32 nand_program_4740(void *context, int spage, int pages, int option)
 		__nand_cmd(CMD_READ_STATUS);
 
 		if (__nand_data8() & 0x01)  /* page program error */
-			;
+		{
+			serial_puts("Skip a write fail block\n");
+			nand_erase_4740( 1, cur/ppb, 1);  //force erase before
+			nand_mark_bad_4740(cur/ppb);
+			spage += ppb;
+			goto restart;
+		}
+			
 		i ++;
 		cur ++;
 	}
+
+	if (wp_pin)
+		__gpio_clear_pin(wp_pin);
 	return cur;
 }
 
 static u32 nand_mark_bad_page(u32 page)
 {
-	u8 badbuf[3000];
+	u8 badbuf[4096 + 128];
 	u32 i;
 
+	if (wp_pin)
+		__gpio_set_pin(wp_pin);
+	//all set to 0x00
 	for (i = 0; i < pagesize + oobsize; i++)
 		badbuf[i] = 0x00;
-	//all set to 0x00
 
 	__nand_cmd(CMD_READA);
 	__nand_cmd(CMD_SEQIN);
 
 	__nand_addr(0);
-	if (pagesize == 2048)
+	if (pagesize != 512)
 		__nand_addr(0);
 	for (i = 0; i < row; i++) {
 		__nand_addr(page & 0xff);
@@ -655,6 +691,8 @@ static u32 nand_mark_bad_page(u32 page)
 	__nand_cmd(CMD_PGPROG);
 	__nand_ready();
 
+	if (wp_pin)
+		__gpio_clear_pin(wp_pin);
 	return page;
 }
 
@@ -663,7 +701,7 @@ u32 nand_mark_bad_4740(int block)
 {
 	u32 rowaddr;
 
-	nand_erase_4740( 1, block, 1);  //force erase before
+//	nand_erase_4740( 1, block, 1);  //force erase before
 	if ( bad_block_page >= ppb )    //absolute bad block mark!
 	{                               //mark four page!
 		rowaddr = block * ppb + 0;

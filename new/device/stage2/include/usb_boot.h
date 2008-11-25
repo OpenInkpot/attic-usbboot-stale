@@ -1,7 +1,8 @@
 #ifndef __USB_BOOT_H
 #define __USB_BOOT_H
 
-#define dprintf(x...) printf(x);
+#define dprintf(x...) 
+//printf(x);
 
 //#define BULK_OUT_BUF_SIZE 0x84000      //buffer size :2M
 //#define BULK_IN_BUF_SIZE 0x84000       //2M too

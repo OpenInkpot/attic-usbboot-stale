@@ -1,8 +1,6 @@
-#include "jz4740.h"
+#include "jz4750.h"
 
-#define UART_BASE UART0_BASE
-//#define EXTAL_CLK 32768000
-//#define CONFIG_BAUDRATE 9600
+volatile u32 UART_BASE;
 #define CONFIG_BAUDRATE 57600
 #define CFG_EXTAL		12000000	/* EXTAL freq must=12 MHz !! */
 
@@ -45,28 +43,6 @@ void serial_puts (const char *s)
 	}
 }
 
-#if 0
-int serial_getc (void)
-{
-	volatile u8 *uart_rdr = (volatile u8 *)(UART_BASE + OFF_RDR);
-
-	while (!serial_tstc());
-
-	return *uart_rdr;
-}
-
-int serial_tstc (void)
-{
-	volatile u8 *uart_lsr = (volatile u8 *)(UART_BASE + OFF_LSR);
-
-	if (*uart_lsr & UART_LSR_DR) {
-		/* Data in rfifo */
-		return (1);
-	}
-	return 0;
-}
-#endif
-
 void serial_init(void)
 {
 	volatile u8 *uart_fcr = (volatile u8 *)(UART_BASE + OFF_FCR);
@@ -93,7 +69,6 @@ void serial_init(void)
 	*uart_fcr = UART_FCR_UUE | UART_FCR_FE | UART_FCR_TFLS | UART_FCR_RFLS;
 }
 
-#if 1
 void serial_put_hex(unsigned int  d)
 {
 	unsigned char c[12];
@@ -111,4 +86,3 @@ void serial_put_hex(unsigned int  d)
 	serial_puts(c);
 
 }
-#endif

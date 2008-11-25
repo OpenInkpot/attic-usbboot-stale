@@ -2,7 +2,7 @@ OUTPUT_ARCH(mips)
 ENTRY(_start)
 MEMORY
 {
-	ram	: ORIGIN = 0x82000000 - 0x300000 , LENGTH = 3M
+	ram	: ORIGIN = 0x80000000 , LENGTH = 3M
 }
 
 SECTIONS
@@ -20,7 +20,9 @@ SECTIONS
 	.data : { *(.data*) *(.scommon*) *(.reginfo*) } > ram
 
 	_gp = ALIGN(16);
+
 	.got : { *(.got*) } > ram
+	_got_end = ABSOLUTE(.);	
 
 	. = ALIGN(4);
 	.sbss : { *(.sbss*) } > ram

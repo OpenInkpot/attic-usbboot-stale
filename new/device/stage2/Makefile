@@ -16,18 +16,28 @@ OBJCOPY	:= mipsel-linux-objcopy
 NM	:= mipsel-linux-nm
 OBJDUMP	:= mipsel-linux-objdump
 
-CFLAGS	:= -mips32 -O2 -mno-abicalls -fno-pic -fno-builtin \
+CFLAGS	:= -mips32 -O2  -FPIC \
 	   -fno-exceptions -ffunction-sections \
 	   -fomit-frame-pointer -msoft-float -G 0
-LDFLAGS	:= -nostdlib -T target.ld
+
+#CFLAGS	:= -mips32 -O2  -FPIC -mno-abicalls -fno-builtin \
+
+LDFLAGS	:= -nostdlib -T target.ld $(CFLAGS)
+#-FPIC
+#-fno-pic
+#-FPIC
+
 LIBS	:= -lstdc++ -lc -lm -lgcc
 
 USBBOOTDIR := .
 
 LIBDIR	:= 
 
+#SOURCES += $(wildcard $(USBBOOTDIR)/usb_boot/*.c) 
+
+SOURCES := ./usb_boot/main.c ./usb_boot/udc.c ./usb_boot/cache.c ./usb_boot/serial.c ./usb_boot/boothandler.c
+SOURCES += $(wildcard $(USBBOOTDIR)/nandflash/*.c) 
 SOURCES	+= $(wildcard $(USBBOOTDIR)/usb_boot/*.S)
-SOURCES += $(wildcard $(USBBOOTDIR)/usb_boot/*.c) $(wildcard $(USBBOOTDIR)/nandflash/*.c) 
 
 HEADS	:= $(SOCDIR)/head.S 
 
@@ -48,15 +58,15 @@ all:	$(APP)
 	$(OBJDUMP) -h $(APP) > $(TARGET).map
 
 $(APP):	$(HEADO) $(OBJS) $(EXTLIBS) 
-	$(LD) $(LDFLAGS) $^ -o $@
+	$(CC) $(LDFLAGS) $^ -o $@
 
 .c.o:
 	$(CC) $(CFLAGS) -o $@ -c $<
 .cpp.o:
 	$(CC) $(CFLAGS) -fno-rtti -fvtable-gc -o $@ -c $<
 .S.o:
-	$(CC) $(CFLAGS) -D_ASSEMBLER_ -D__ASSEMBLY__ -o $@ -c $<
+	$(CC) $(CFLAGS) -o $@ -c $<
 
 clean:
-	rm -fr *.o $(APP) $(OBJS) core $(OTHER) *.sym *.map *.dump *.bin *.lib *.~ *.#
+	rm -fr *.o $(APP) $(OBJS) core $(OTHER) *.sym *.map *.dump *.bin *.lib *.~ *.\#
 
