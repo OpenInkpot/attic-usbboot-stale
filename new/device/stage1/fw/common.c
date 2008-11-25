@@ -1,29 +1,6 @@
 #include "jz4740.h"
 #include "configs.h"
 
-#define UART_BASE UART0_BASE
-//#define CFG_EXTAL		12000000	/* EXTAL freq must=12 MHz !! */
-//#define CONFIG_BAUDRATE         57600           // baubrate for serail port
-
-void serial_setbrg (void)
-{
-	volatile u8 *uart_lcr = (volatile u8 *)(UART_BASE + OFF_LCR);
-	volatile u8 *uart_dlhr = (volatile u8 *)(UART_BASE + OFF_DLHR);
-	volatile u8 *uart_dllr = (volatile u8 *)(UART_BASE + OFF_DLLR);
-	u32 baud_div, tmp;
-
-	baud_div = CFG_EXTAL / 16 / CONFIG_BAUDRATE;
-	tmp = *uart_lcr;
-	tmp |= UART_LCR_DLAB;
-	*uart_lcr = tmp;
-
-	*uart_dlhr = (baud_div >> 8) & 0xff;
-	*uart_dllr = baud_div & 0xff;
-
-	tmp &= ~UART_LCR_DLAB;
-	*uart_lcr = tmp;
-}
-
 void serial_putc (const char c)
 {
 	volatile u8 *uart_lsr = (volatile u8 *)(UART_BASE + OFF_LSR);
@@ -84,8 +61,29 @@ void serial_init(void)
 	*uart_lcr = UART_LCR_WLEN_8 | UART_LCR_STOP_1;
 
 	/* Set baud rate */
-	serial_setbrg();
+	if ( CPU_ID == 0x4740 )
+		serial_setbrg_4740();
+	else
+		serial_setbrg_4750();
 
 	/* Enable UART unit, enable and clear FIFO */
 	*uart_fcr = UART_FCR_UUE | UART_FCR_FE | UART_FCR_TFLS | UART_FCR_RFLS;
+}
+
+void serial_put_hex(unsigned int  d)
+{
+	unsigned char c[12];
+	char i;
+	for(i = 0; i < 8;i++)
+	{
+		c[i] = (d >> ((7 - i) * 4)) & 0xf;
+		if(c[i] < 10)
+			c[i] += 0x30;
+		else
+			c[i] += (0x41 - 10);
+	}
+	c[8] = '\n';
+	c[9] = 0;
+	serial_puts(c);
+
 }

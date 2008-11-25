@@ -19,7 +19,8 @@ SECTIONS
 	. = ALIGN(4);
 	.data : { *(.data*) *(.scommon*) *(.reginfo*) } > ram
 
-	_gp = ALIGN(16);
+	_gp = ABSOLUTE(.); /* Base of small data */
+
 	.got : { *(.got*) } > ram
 
 	. = ALIGN(4);

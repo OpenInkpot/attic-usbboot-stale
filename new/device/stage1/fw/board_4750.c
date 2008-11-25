@@ -7,58 +7,20 @@
  *
  */
 
-#include "jz4740.h"
+#include "jz4750.h"
 #include "configs.h"
 
-void gpio_init(void)
+void gpio_init_4750(void)
 {
-	/*
-	 * Initialize SDRAM pins
-	 */
-
-	/* PORT A: D0 ~ D31 */
-	REG_GPIO_PXFUNS(0) = 0xffffffff;
-	REG_GPIO_PXSELC(0) = 0xffffffff;
-
-	/* PORT B: A0 ~ A16, DCS#, RAS#, CAS#, CKE#, RDWE#, CKO#, WE0# */
-	REG_GPIO_PXFUNS(1) = 0x81f9ffff;
-	REG_GPIO_PXSELC(1) = 0x81f9ffff;
-
-	/* PORT C: WE1#, WE2#, WE3# */
-	REG_GPIO_PXFUNS(2) = 0x07000000;
-	REG_GPIO_PXSELC(2) = 0x07000000;
-
-	/*
-	 * Initialize Static Memory Pins
-	 */
-
-	/* CS4# */
-	REG_GPIO_PXFUNS(1) = 0x10000000;
-	REG_GPIO_PXSELC(1) = 0x10000000;
-
-	/*
-	 * Initialize UART0 pins
-	 */
-
-	/* PORT D: TXD/RXD */
-	REG_GPIO_PXFUNS(3) = 0x06000000;
-	REG_GPIO_PXSELS(3) = 0x06000000;
-
-	__gpio_as_nand();
-
-	/*
-	 * Initialize SDRAM pins
-	 */
 	__gpio_as_sdram_32bit();
-
-	/*
-	 * Initialize UART0 pins
-	 */
+	__gpio_as_uart1();
 	__gpio_as_uart0();
-
+	__gpio_as_uart2();
+	__gpio_as_uart3();
+	__gpio_as_nand_8bit();
 }
 
-void pll_init(void)
+void ccpll_init_4750(void)
 {
 	register unsigned int cfcr, plcr1;
 	int n2FR[33] = {
@@ -66,21 +28,17 @@ void pll_init(void)
 		7, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0,
 		9
 	};
-	int div[5] = {1, 4, 4, 4, 4}; /* divisors of I:S:P:L:M */
-	//int div[5] = {1, 3, 3, 3, 3}; /* divisors of I:S:P:L:M */
+//	int div[5] = {1, 4, 4, 4, 4}; /* divisors of I:S:P:L:M */
 	int nf, pllout2;
 
-	cfcr = CPM_CPCCR_CLKOEN |
-		(n2FR[div[0]] << CPM_CPCCR_CDIV_BIT) | 
-		(n2FR[div[1]] << CPM_CPCCR_HDIV_BIT) | 
-		(n2FR[div[2]] << CPM_CPCCR_PDIV_BIT) |
-		(n2FR[div[3]] << CPM_CPCCR_MDIV_BIT) |
-		(n2FR[div[4]] << CPM_CPCCR_LDIV_BIT);
+	cfcr = ~CPM_CPCCR_ECS &
+		(n2FR[1] << CPM_CPCCR_CDIV_BIT) | 
+		(n2FR[PHM_DIV] << CPM_CPCCR_HDIV_BIT) | 
+		(n2FR[PHM_DIV] << CPM_CPCCR_PDIV_BIT) |
+		(n2FR[PHM_DIV] << CPM_CPCCR_MDIV_BIT) |
+		(n2FR[PHM_DIV] << CPM_CPCCR_LDIV_BIT);
 
 	pllout2 = (cfcr & CPM_CPCCR_PCS) ? CFG_CPU_SPEED : (CFG_CPU_SPEED / 2);
-
-	/* Init UHC clock */
-	REG_CPM_UHCCDR = pllout2 / 48000000 - 1;
 
 	nf = CFG_CPU_SPEED * 2 / CFG_EXTAL;
 	plcr1 = ((nf - 2) << CPM_CPPCR_PLLM_BIT) | /* FD */
@@ -94,23 +52,53 @@ void pll_init(void)
 	REG_CPM_CPPCR = plcr1;
 } 
 
+int nf, pllout2;
 
-//----------------------------------------------------------------------------
-
-// SDRAM Timings, unit: ns
-#define SDRAM_TRAS		45	/* RAS# Active Time */
-#define SDRAM_RCD		20	/* RAS# to CAS# Delay */
-#define SDRAM_TPC		20	/* RAS# Precharge Time */
-#define SDRAM_TRWL		7	/* Write Latency Time */
-#define SDRAM_TREF	        15625	/* Refresh period: 4096 refresh cycles/64ms */
-
-#define CPU_CLK			8000000
-#define MEM_CLK			8000000
-
-
-void sdram_init(void)
+void pll_init_4750(void)
 {
-	register unsigned int dmcr0, dmcr, sdmode, tmp, cpu_clk, mem_clk, ns;
+	register unsigned int cfcr, plcr1,tmp;
+	int n2FR[33] = {
+		0, 0, 1, 2, 3, 0, 4, 0, 5, 0, 0, 0, 6, 0, 0, 0,
+		7, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0,
+		9
+	};
+	int div[5] = {1, 3, 3, 3, 3}; /* divisors of I:S:P:L:M */
+
+	cfcr = 	CPM_CPCCR_PCS |
+		(n2FR[1] << CPM_CPCCR_CDIV_BIT) | 
+		(n2FR[PHM_DIV] << CPM_CPCCR_HDIV_BIT) | 
+		(n2FR[PHM_DIV] << CPM_CPCCR_PDIV_BIT) |
+		(n2FR[PHM_DIV] << CPM_CPCCR_MDIV_BIT) |
+		(n2FR[PHM_DIV] << CPM_CPCCR_LDIV_BIT);
+
+	if (CFG_EXTAL > 16000000)
+		cfcr |= CPM_CPCCR_ECS;
+
+	pllout2 = (cfcr & CPM_CPCCR_PCS) ? CFG_CPU_SPEED : (CFG_CPU_SPEED / 2);
+
+	/* Init USB Host clock, pllout2 must be n*48MHz */
+//	REG_CPM_UHCCDR = pllout2 / 48000000 - 1;
+
+	nf = CFG_CPU_SPEED * 2 / CFG_EXTAL;
+	plcr1 = ((nf - 2) << CPM_CPPCR_PLLM_BIT) | /* FD */
+		(0 << CPM_CPPCR_PLLN_BIT) |	/* RD=0, NR=2 */
+		(0 << CPM_CPPCR_PLLOD_BIT) |    /* OD=0, NO=1 */
+		(0x20 << CPM_CPPCR_PLLST_BIT) | /* PLL stable time */
+		CPM_CPPCR_PLLEN;                /* enable PLL */          
+
+	cfcr |= CPM_CPCCR_UCS;           /* set PLL as UDC PHY*/
+	tmp = pllout2 / 1000000 / 12 - 1;
+	cfcr |= (tmp << CPM_CPCCR_UDIV_BIT);    /* set UDC DIV*/
+
+	/* init PLL */
+	REG_CPM_CPCCR = cfcr;
+	REG_CPM_CPPCR = plcr1;
+}
+
+void sdram_init_4750(void)
+{
+	register unsigned int dmcr, sdmode, tmp, cpu_clk, mem_clk, ns;
+	register unsigned int sdemode; /*SDRAM Extended Mode*/
 
 	unsigned int cas_latency_sdmr[2] = {
 		EMC_SDMR_CAS_2,
@@ -127,20 +115,11 @@ void sdram_init(void)
 	cpu_clk = CFG_CPU_SPEED;
 	mem_clk = cpu_clk * div[__cpm_get_cdiv()] / div[__cpm_get_mdiv()];
 
+	/*set REG_EMC_DMARn for two 64M sdram*/
+	REG_EMC_DMAR0 = EMC_DMAR0_BASE | EMC_DMAR_MASK_64_64;
+
 	REG_EMC_BCR = 0;	/* Disable bus release */
 	REG_EMC_RTCSR = 0;	/* Disable clock for counting */
-
-	/* Fault DMCR value for mode register setting*/
-#define SDRAM_ROW0    SDRAM_ROW
-#define SDRAM_COL0     SDRAM_COL
-#define SDRAM_BANK40   SDRAM_BANK4
-
-	dmcr0 = ((SDRAM_ROW0-11)<<EMC_DMCR_RA_BIT) |
-		((SDRAM_COL0-8)<<EMC_DMCR_CA_BIT) |
-		(SDRAM_BANK40<<EMC_DMCR_BA_BIT) |
-		(SDRAM_BW16<<EMC_DMCR_BW_BIT) |
-		EMC_DMCR_EPIN |
-		cas_latency_dmcr[((SDRAM_CASL == 3) ? 1 : 0)];
 
 	/* Basic DMCR value */
 	dmcr = ((SDRAM_ROW-11)<<EMC_DMCR_RA_BIT) |
@@ -179,6 +158,10 @@ void sdram_init(void)
 	REG_EMC_DMCR = dmcr;
 	REG8(EMC_SDMR0|sdmode) = 0;
 
+	if (CONFIG_MOBILE_SDRAM == 1)
+		/* Mobile SDRAM Extended Mode Register */
+		sdemode = EMC_SDMR_SET_BA1 | EMC_SDMR_DS_FULL | EMC_SDMR_PRSR_ALL;
+
 	/* Wait for precharge, > 200us */
 	tmp = (cpu_clk / 1000000) * 1000;
 	while (tmp--);
@@ -198,13 +181,35 @@ void sdram_init(void)
 	while (tmp--);
 
  	/* Stage 3. Mode Register Set */
-	REG_EMC_DMCR = dmcr0 | EMC_DMCR_RFSH | EMC_DMCR_MRSET;
+	REG_EMC_DMCR = dmcr | EMC_DMCR_RFSH | EMC_DMCR_MRSET | EMC_DMCR_MBSEL_B0;
 	REG8(EMC_SDMR0|sdmode) = 0;
 
-        /* Set back to basic DMCR value */
+	if (CONFIG_MOBILE_SDRAM == 1)
+		REG8(EMC_SDMR0|sdemode) = 0;   	/* Set Mobile SDRAM Extended Mode Register */
+
+	/* Set back to basic DMCR value */
 	REG_EMC_DMCR = dmcr | EMC_DMCR_RFSH | EMC_DMCR_MRSET;
 
 	/* everything is ok now */
 }
 
+void serial_setbrg_4750(void)
+{
+	volatile u8 *uart_lcr = (volatile u8 *)(UART_BASE + OFF_LCR);
+	volatile u8 *uart_dlhr = (volatile u8 *)(UART_BASE + OFF_DLHR);
+	volatile u8 *uart_dllr = (volatile u8 *)(UART_BASE + OFF_DLLR);
+	u32 baud_div, tmp;
+
+	baud_div = (REG_CPM_CPCCR & CPM_CPCCR_ECS) ?
+		(CFG_EXTAL / 32 / CONFIG_BAUDRATE) : (CFG_EXTAL / 16 / CONFIG_BAUDRATE);
+	tmp = *uart_lcr;
+	tmp |= UART_LCR_DLAB;
+	*uart_lcr = tmp;
+
+	*uart_dlhr = (baud_div >> 8) & 0xff;
+	*uart_dllr = baud_div & 0xff;
+
+	tmp &= ~UART_LCR_DLAB;
+	*uart_lcr = tmp;
+}
 
