@@ -368,7 +368,7 @@ static int read_oob(void *buf, u32 size, u32 pg)
 	read_proc(buf, size);
 
 	if (pagesize == 512)
-		__nand_disable();
+		__nand_sync();
 	return 0;
 }
 
