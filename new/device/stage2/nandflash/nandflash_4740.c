@@ -296,7 +296,7 @@ u32 nand_erase_4740(int blk_num, int sblk, int force)
 			if (nand_check_block(cur/ppb))
 			{
 				cur += ppb;
-				blk_num += (Hand.nand_plane - 1);
+				blk_num += Hand.nand_plane;
 				continue;
 			}
 		}
@@ -313,10 +313,11 @@ u32 nand_erase_4740(int blk_num, int sblk, int force)
 
 		if (__nand_data8() & 0x01) 
 		{
-			serial_puts("Skip a abs block\n");
+			serial_puts("Erase fail at ");
+			serial_put_hex(cur / ppb);
 			nand_mark_bad_4740(cur/ppb);
 			cur += ppb;
-			blk_num += (Hand.nand_plane - 1);
+			blk_num += Hand.nand_plane;
 			continue;
 		}
 		cur += ppb;

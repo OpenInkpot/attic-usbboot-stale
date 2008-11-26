@@ -182,7 +182,6 @@ static int nand_check_block(u32 block)
 {
 	u32 pg,i;
 
-//	return 0;
 	if ( bad_block_page >= ppb )    //do absolute bad block detect!
 	{
 		pg = block * ppb + 0;
@@ -190,6 +189,7 @@ static int nand_check_block(u32 block)
 		if ( oob_buf[0] != 0xff || oob_buf[1] != 0xff )
 		{
 			serial_puts("Absolute skip a bad block\n");
+			serial_put_hex(block);
 			return 1;
 		}
 
@@ -198,6 +198,7 @@ static int nand_check_block(u32 block)
 		if ( oob_buf[0] != 0xff || oob_buf[1] != 0xff )
 		{
 			serial_puts("Absolute skip a bad block\n");
+			serial_put_hex(block);
 			return 1;
 		}
 
@@ -206,6 +207,7 @@ static int nand_check_block(u32 block)
 		if ( oob_buf[0] != 0xff || oob_buf[1] != 0xff )
 		{
 			serial_puts("Absolute skip a bad block\n");
+			serial_put_hex(block);
 			return 1;
 		}
 
@@ -214,6 +216,7 @@ static int nand_check_block(u32 block)
 		if ( oob_buf[0] != 0xff || oob_buf[1] != 0xff )
 		{
 			serial_puts("Absolute skip a bad block\n");
+			serial_put_hex(block);
 			return 1;
 		}
 
@@ -224,7 +227,8 @@ static int nand_check_block(u32 block)
 		read_oob(oob_buf, oobsize, pg);
 		if (oob_buf[bad_block_pos] != 0xff)
 		{
-			serial_puts("Skip a bad block\n");
+			serial_puts("Skip a bad block at");
+			serial_put_hex(block);
 			return 1;
 		}
 
@@ -249,7 +253,6 @@ u32 nand_read_raw_4750(void *buf, u32 startpage, u32 pagenum, int option)
 	cur_page = startpage;
 	cnt = 0;
 	while (cnt < pagenum) {
-//		__nand_sync();
 		if ((cur_page % ppb) == 0) {
 			if (nand_check_block(cur_page / ppb)) {
 				cur_page += ppb;   // Bad block, set to next block 
@@ -304,10 +307,9 @@ u32 nand_erase_4750(int blk_num, int sblk, int force)
 			if (nand_check_block(cur/ppb))
 			{
 				cur += ppb;
-				blk_num += (Hand.nand_plane - 1);
+				blk_num += Hand.nand_plane;
 				continue;
 			}
-
 		
 		__nand_cmd(CMD_ERASE_SETUP);
 
@@ -321,17 +323,18 @@ u32 nand_erase_4750(int blk_num, int sblk, int force)
 
 		if (__nand_data8() & 0x01) 
 		{
-			serial_puts("Erase fail! \n");
+			serial_puts("Erase fail at ");
+			serial_put_hex(cur / ppb);
 			nand_mark_bad_4750(cur / ppb);
 			cur += ppb;
-			blk_num += (Hand.nand_plane - 1);
+			blk_num += Hand.nand_plane;
 			continue;
 		}
 		cur += ppb;
 	}
 
-	if (wp_pin)
-		__gpio_clear_pin(wp_pin);
+//	if (wp_pin)
+//		__gpio_clear_pin(wp_pin);
 	return cur;
 }
 
@@ -711,8 +714,8 @@ restart:
 		cur_page++;
 	}
 
-	if (wp_pin)
-		__gpio_clear_pin(wp_pin);
+//	if (wp_pin)
+//		__gpio_clear_pin(wp_pin);
 	return cur_page;
 }
 
@@ -742,8 +745,8 @@ static u32 nand_mark_bad_page(u32 page)
 	__nand_cmd(CMD_PGPROG);
 	__nand_ready();
 
-	if (wp_pin)
-		__gpio_clear_pin(wp_pin);
+//	if (wp_pin)
+//		__gpio_clear_pin(wp_pin);
 	return page;
 }
 
@@ -751,7 +754,7 @@ u32 nand_mark_bad_4750(int block)
 {
 	u32 rowaddr;
 
-	nand_erase_4750( 1, block, 1);  //force erase before
+//	nand_erase_4750( 1, block, 1);  //force erase before
 	if ( bad_block_page >= ppb )    //absolute bad block mark!
 	{                               //mark four page!
 		rowaddr = block * ppb + 0;
