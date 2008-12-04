@@ -55,11 +55,29 @@ static u8 oob_buf[128] = {0};
 
 #define dprintf(x) serial_puts(x)
 
+static unsigned int EMC_CSN[4]=
+{
+	0xb8000000,
+	0xb4000000,
+	0xa8000000,
+	0xa4000000
+};
+
 static inline void __nand_sync(void)
 {
 	unsigned int timeout = 60000;
 	while ((REG_GPIO_PXPIN(2) & 0x40000000) && timeout--);
 	while (!(REG_GPIO_PXPIN(2) & 0x40000000));
+}
+
+static void select_chip(int block)
+{
+	int t;
+	if (!Hand.nand_bpc) return;
+	t = (block / Hand.nand_bpc) % 4;
+	addrport = EMC_CSN[t] + 0x10000;
+	dataport = EMC_CSN[t];
+	cmdport =  EMC_CSN[t] + 0x8000;
 }
 
 static int read_oob(void *buf, u32 size, u32 pg);
@@ -128,6 +146,7 @@ int nand_init_4740(int bus_width, int row_cycle, int page_size, int page_per_blo
 //	nand_enable(0);
 	/* Initialize NAND Flash Pins */
 	nand_init_gpio();
+	select_chip(0);
 //	REG_EMC_SMCR1 = 0x0fff7700;      //slow speed
 	REG_EMC_SMCR1 = 0x04444400;      //normal speed
 //	REG_EMC_SMCR1 = 0x0d221200;      //fast speed
@@ -242,7 +261,7 @@ u32 nand_read_raw_4740(void *buf, u32 startpage, u32 pagenum, int option)
 	cur_page = startpage;
 	cnt = 0;
 	while (cnt < pagenum) {
-		//__nand_sync();
+		select_chip(cnt / ppb);
 		if ((cur_page % ppb) == 0) {
 			if (nand_check_block(cur_page / ppb)) {
 				cur_page += ppb;   // Bad block, set to next block 
@@ -291,6 +310,7 @@ u32 nand_erase_4740(int blk_num, int sblk, int force)
 	cur = sblk * ppb;
 	for (i = 0; i < blk_num; ) {
 		rowaddr = cur;
+		select_chip(cur / ppb);
 		if ( !force )
 		{
 			if (nand_check_block(cur/ppb))
@@ -333,6 +353,7 @@ static int read_oob(void *buf, u32 size, u32 pg)
 {
 	u32 i, coladdr, rowaddr;
 
+	select_chip(pg / ppb);
 	if (pagesize == 512)
 		coladdr = 0;
 	else
@@ -411,6 +432,7 @@ u32 nand_read_4740(void *buf, u32 startpage, u32 pagenum, int option)
 	tmpbuf = buf;
 
 	while (cnt < pagenum) {
+		select_chip(cnt / ppb);
 		/* If this is the first page of the block, check for bad. */
 		if ((cur_page % ppb) == 0) {
 			cur_blk = cur_page / ppb;
@@ -506,7 +528,7 @@ u32 nand_program_4740(void *context, int spage, int pages, int option)
 {
 	u32 i, j, cur, rowaddr;
 	u8 *tmpbuf;
-	u32 ecccnt,oobsize_sav,ecccnt_sav;
+	u32 ecccnt,oobsize_sav,ecccnt_sav,eccpos_sav;
 	u8 ecc_buf[128];
 
 	if (wp_pin)
@@ -515,17 +537,21 @@ restart:
 	tmpbuf = (u8 *)context;
 	ecccnt_sav = ecccnt = pagesize / ECC_BLOCK;
 	oobsize_sav = oobsize;
+	eccpos_sav = ecc_pos;
 	i = 0;
 	cur = spage;
 
 	while (i < pages) {
+		select_chip(cur / ppb);
 #if 1
 		if ((pagesize == 4096) && (cur < 8)) {
 			ecccnt = 4;
 			oobsize = 64;
+			ecc_pos = 6;
 		} else {
 			ecccnt = ecccnt_sav;
 			oobsize = oobsize_sav;
+			ecc_pos = eccpos_sav;
 		}
 
                 /* Skip 16KB after nand_spl if pagesize=4096 */
@@ -690,7 +716,7 @@ static u32 nand_mark_bad_page(u32 page)
 
 	write_proc((char *)badbuf, pagesize + oobsize);
 	__nand_cmd(CMD_PGPROG);
-	__nand_ready();
+	__nand_sync();
 
 	if (wp_pin)
 		__gpio_clear_pin(wp_pin);
