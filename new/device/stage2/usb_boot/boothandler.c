@@ -3,13 +3,11 @@
 #include"jz4740.h"
 #include "usb.h" 
 #include "error.h"
-//#include "flash.h"
 #include "usb_boot.h"
 #include "hand.h"
 #include "nandflash.h"
 #include "udc.h"
 #define dprintf(x) serial_puts(x)
-//printf(x)
 
 unsigned int (*nand_query)(u8 *);
 int (*nand_init)(int bus_width, int row_cycle, int page_size, int page_per_block,
@@ -25,16 +23,17 @@ void (*nand_enable) (unsigned int csn);
 void (*nand_disable) (unsigned int csn);
 
 hand_t Hand,*Hand_p;
-//flash_info_t Info,*Info_p;
 extern u32 Bulk_out_buf[BULK_OUT_BUF_SIZE];
 extern u32 Bulk_in_buf[BULK_IN_BUF_SIZE];
 extern u16 handshake_PKT[4];
-u32 ret_dat;
 extern udc_state;
+extern void *memset(void *, int , size_t);
+extern void *memcpy(void *, const void *, size_t);
+
+u32 ret_dat;
 u32 start_addr;  //program operation start address or sector
 u32 ops_length;  //number of operation unit ,in byte or sector
 u32 ram_addr;
-
 
 void config_flash_info()
 {
@@ -51,7 +50,7 @@ void config_hand()
 {
 	hand_t *hand_p;
 	hand_p=( hand_t *)Bulk_out_buf;
-	memcpy( &Hand, (unsigned char *)Bulk_out_buf, sizeof(hand_t));
+	memcpy(&Hand, (unsigned char *)Bulk_out_buf, sizeof(hand_t));
 
 #if 0
 	Hand.nand_bw=hand_p->nand_bw;
@@ -153,7 +152,7 @@ int NAND_OPS_Handle(u8 *buf)
 	{
 	case NAND_QUERY:
 		dprintf("\n Request : NAND_QUERY!");
-		nand_query(Bulk_in_buf);
+		nand_query((u8 *)Bulk_in_buf);
 		HW_SendPKT(1, Bulk_in_buf, 8);
 		handshake_PKT[3]=(u16)ERR_OK;
 		udc_state = BULK_IN;
@@ -262,7 +261,6 @@ int NAND_OPS_Handle(u8 *buf)
 		return ERR_OPS_NOTSUPPORT;
 	}
 
-//	nand_disable(CSn);
 	return ERR_OK;
 }
 

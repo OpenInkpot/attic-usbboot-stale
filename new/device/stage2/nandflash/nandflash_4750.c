@@ -3,7 +3,7 @@
 #include "usb_boot.h"
 #include "hand.h"
 
-//#define dprintf(n...)
+#define dprintf(n...)
 
 #define __nand_enable()		(REG_EMC_NFCSR |= EMC_NFCSR_NFE1 | EMC_NFCSR_NFCE1)
 #define __nand_disable()	(REG_EMC_NFCSR &= ~(EMC_NFCSR_NFCE1))
@@ -38,8 +38,7 @@ static int oobfs = 0;            /* 1:store file system information in oob, 0:do
 static int oobecc = 0;           /* Whether the oob data of the binary contains ECC data? */
 static int bad_block_page = 127; /* Specify the page number of badblock flag inside a block */
 static u32 bad_block_pos = 0;    /* Specify the badblock flag offset inside the oob */
-//static u8 data_buf[4096] = {0};
-static u8 oob_buf[128] = {0};
+static u8 oob_buf[256] = {0};
 extern hand_t Hand;
 
 static inline void __nand_sync(void)
@@ -58,7 +57,6 @@ static int nand_data_read16(char *buf, int count);
 static int (*write_proc)(char *, int) = NULL;
 static int (*read_proc)(char *, int) = NULL;
 
-//extern void dumpbuf(u8 *p, int count);
 inline void nand_enable_4750(unsigned int csn)
 {
 	//modify this fun to a specifical borad
@@ -101,8 +99,6 @@ int nand_init_4750(int bus_width, int row_cycle, int page_size, int page_per_blo
 	oobsize = pagesize / 32;
 	ppb = page_per_block;
 	bchbit = bch_bit;
-//	oobfs = oob_fs;
-//	oobecc = oob_ecc;
 	forceerase = force;
 	eccpos = ecc_pos;
 	bad_block_pos = bad_pos;
@@ -113,6 +109,7 @@ int nand_init_4750(int bus_width, int row_cycle, int page_size, int page_per_blo
 		par_size = 13;
 	else
 		par_size = 7;
+
 
 #if 0
 	gpio_base = (u8 *)gbase;
@@ -126,6 +123,11 @@ int nand_init_4750(int bus_width, int row_cycle, int page_size, int page_per_blo
 		__gpio_as_nand_8bit();
 	}
 
+	if (wp_pin)
+	{
+		__gpio_as_output(wp_pin);
+		__gpio_disable_pull(wp_pin);
+	}
 	__nand_enable();
 
 //	REG_EMC_SMCR1 = 0x0fff7700;      //slow speed
@@ -333,8 +335,8 @@ u32 nand_erase_4750(int blk_num, int sblk, int force)
 		cur += ppb;
 	}
 
-//	if (wp_pin)
-//		__gpio_clear_pin(wp_pin);
+	if (wp_pin)
+		__gpio_clear_pin(wp_pin);
 	return cur;
 }
 
@@ -562,8 +564,10 @@ u32 nand_program_4750(void *context, int spage, int pages, int option)
 	u32 i, j, cur_page, cur_blk, rowaddr;
 	u8 *tmpbuf;
 	u32 ecccnt;
-	u8 ecc_buf[128];
+	u8 ecc_buf[256];
 	u32 oob_per_eccsize;
+	int eccpos_sav = eccpos, bchbit_sav = bchbit, par_size_sav = par_size;
+	int spl_size = 16 * 1024 / pagesize;
 
 	if (wp_pin)
 		__gpio_set_pin(wp_pin);
@@ -576,6 +580,16 @@ restart:
 	cur_page = spage;
 
 	while (i < pages) {
+		if (cur_page < spl_size) {
+			bchbit = 8;
+			eccpos = 3;
+			par_size = 13;
+		} else if (cur_page == spl_size) {
+			bchbit = bchbit_sav;
+			eccpos = eccpos_sav;
+			par_size = par_size_sav;
+		}
+
 		if ((cur_page % ppb) == 0) { /* First page of block, test BAD. */
 			if (nand_check_block(cur_page / ppb)) {
 				cur_page += ppb;   /* Bad block, set to next block */
@@ -622,25 +636,6 @@ restart:
 			paraddr = (volatile u8 *)BCH_PAR0;
 
 			REG_BCH_INTS = 0xffffffff;
-			
-			if (cur_page >= 16384 / pagesize)
-			{
-				if (bchbit == 8)
-				{
-					__ecc_encoding_8bit();
-					par_size = 13;
-				}
-				else
-				{
-					__ecc_encoding_4bit();
-					par_size = 7;
-				}
-			}
-			else
-			{
-				__ecc_encoding_8bit();
-				par_size = 13;
-			}
 			
 			/* Set BCHCNT.DEC_COUNT to data block size in bytes */
 			if (option != NO_OOB)
@@ -714,8 +709,12 @@ restart:
 		cur_page++;
 	}
 
-//	if (wp_pin)
-//		__gpio_clear_pin(wp_pin);
+	if (wp_pin)
+		__gpio_clear_pin(wp_pin);
+	bchbit = bchbit_sav;
+	eccpos = eccpos_sav;
+	par_size = par_size_sav;
+
 	return cur_page;
 }
 
@@ -743,10 +742,10 @@ static u32 nand_mark_bad_page(u32 page)
 
 	write_proc((char *)badbuf, pagesize + oobsize);
 	__nand_cmd(CMD_PGPROG);
-	__nand_ready();
+	__nand_sync();
 
-//	if (wp_pin)
-//		__gpio_clear_pin(wp_pin);
+	if (wp_pin)
+		__gpio_clear_pin(wp_pin);
 	return page;
 }
 
@@ -754,7 +753,6 @@ u32 nand_mark_bad_4750(int block)
 {
 	u32 rowaddr;
 
-//	nand_erase_4750( 1, block, 1);  //force erase before
 	if ( bad_block_page >= ppb )    //absolute bad block mark!
 	{                               //mark four page!
 		rowaddr = block * ppb + 0;

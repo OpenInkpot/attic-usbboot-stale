@@ -51,7 +51,7 @@ static int bus = 8, row = 2, pagesize = 2048, oobsize = 64, ppb = 128;
 static int bad_block_pos,bad_block_page,force_erase,ecc_pos,wp_pin;
 extern hand_t Hand;
 //static u8 data_buf[2048] = {0};
-static u8 oob_buf[128] = {0};
+static u8 oob_buf[256] = {0};
 
 #define dprintf(x) serial_puts(x)
 
@@ -75,9 +75,9 @@ static void select_chip(int block)
 	int t;
 	if (!Hand.nand_bpc) return;
 	t = (block / Hand.nand_bpc) % 4;
-	addrport = EMC_CSN[t] + 0x10000;
-	dataport = EMC_CSN[t];
-	cmdport =  EMC_CSN[t] + 0x8000;
+	addrport = (volatile unsigned char *)(EMC_CSN[t] + 0x10000);
+	dataport = (volatile unsigned char *)EMC_CSN[t];
+	cmdport =  (volatile unsigned char *)(EMC_CSN[t] + 0x8000);
 }
 
 static int read_oob(void *buf, u32 size, u32 pg);
@@ -145,12 +145,16 @@ int nand_init_4740(int bus_width, int row_cycle, int page_size, int page_per_blo
 
 //	nand_enable(0);
 	/* Initialize NAND Flash Pins */
+	if (wp_pin)
+	{
+		__gpio_as_output(wp_pin);
+		__gpio_disable_pull(wp_pin);
+	}
 	nand_init_gpio();
 	select_chip(0);
 //	REG_EMC_SMCR1 = 0x0fff7700;      //slow speed
 	REG_EMC_SMCR1 = 0x04444400;      //normal speed
 //	REG_EMC_SMCR1 = 0x0d221200;      //fast speed
-
 
 	if (bus == 8) {
 		write_proc = nand_data_write8;
@@ -508,7 +512,7 @@ u32 nand_read_4740(void *buf, u32 startpage, u32 pagenum, int option)
 			tmpbuf += oobsize;
 			break;
 		case	OOB_NO_ECC:
-			for (j = 0; j < ECC_SIZE; j++)
+			for (j = 0; j < ecccnt * PAR_SIZE; j++)
 				oob_buf[ecc_pos + j] = 0xff;
 			for (j = 0; j < oobsize; j++)
 				tmpbuf[j] = oob_buf[j];
@@ -529,7 +533,7 @@ u32 nand_program_4740(void *context, int spage, int pages, int option)
 	u32 i, j, cur, rowaddr;
 	u8 *tmpbuf;
 	u32 ecccnt,oobsize_sav,ecccnt_sav,eccpos_sav;
-	u8 ecc_buf[128];
+	u8 ecc_buf[256];
 
 	if (wp_pin)
 		__gpio_set_pin(wp_pin);
@@ -689,6 +693,11 @@ restart:
 
 	if (wp_pin)
 		__gpio_clear_pin(wp_pin);
+
+	ecccnt = ecccnt_sav;
+	oobsize = oobsize_sav;
+	ecc_pos = eccpos_sav;
+
 	return cur;
 }
 
