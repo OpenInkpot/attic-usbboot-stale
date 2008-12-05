@@ -1,13 +1,11 @@
 #ifndef __USB_BOOT_H
 #define __USB_BOOT_H
 
-#define dprintf(x...) 
+//#define dprintf(x...) 
 //printf(x);
 
-//#define BULK_OUT_BUF_SIZE 0x84000      //buffer size :2M
-//#define BULK_IN_BUF_SIZE 0x84000       //2M too
-#define BULK_OUT_BUF_SIZE 0x20000      //buffer size :
-#define BULK_IN_BUF_SIZE 0x20000       // too
+#define BULK_OUT_BUF_SIZE 0x21000      //buffer size :
+#define BULK_IN_BUF_SIZE 0x21000       // too
 
 enum UDC_STATE
 {

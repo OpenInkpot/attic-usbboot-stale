@@ -47,7 +47,7 @@ typedef struct {
 	int nand_plane;
 	int nand_bchbit;
 	int nand_wppin;
-	unsigned int nand_ids;  /* vendor_id & device_id */
+	int nand_bpc;
 
 	fw_args_t fw_args;
 } hand_t;
