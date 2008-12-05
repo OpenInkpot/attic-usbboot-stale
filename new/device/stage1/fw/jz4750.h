@@ -1696,7 +1696,7 @@ static inline u32 jz_readl(u32 address)
 #define EMC_RTCOR	(EMC_BASE + 0x8c)  /* Refresh Time Constant Register */
 #define EMC_DMAR0	(EMC_BASE + 0x90)  /* SDRAM Bank 0 Addr Config Register */
 #define EMC_DMAR1	(EMC_BASE + 0x94)  /* SDRAM Bank 1 Addr Config Register */
-#define EMC_SDMR0	(EMC_BASE + 0xa000) /* Mode Register of SDRAM bank 0 */
+#define EMC_SDMR0	(EMC_BASE + 0x8000) /* Mode Register of SDRAM bank 0 */
 
 #define REG_EMC_BCR	REG32(EMC_BCR)
 

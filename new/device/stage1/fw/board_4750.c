@@ -115,8 +115,8 @@ void sdram_init_4750(void)
 	cpu_clk = CFG_CPU_SPEED;
 	mem_clk = cpu_clk * div[__cpm_get_cdiv()] / div[__cpm_get_mdiv()];
 
-	/*set REG_EMC_DMARn for two 64M sdram*/
-	REG_EMC_DMAR0 = EMC_DMAR0_BASE | EMC_DMAR_MASK_64_64;
+	/* set REG_EMC_DMAR0 for supporting 128MB sdram on DCS0 */
+	REG_EMC_DMAR0 = EMC_DMAR0_BASE | EMC_DMAR_MASK_128_128;
 
 	REG_EMC_BCR = 0;	/* Disable bus release */
 	REG_EMC_RTCSR = 0;	/* Disable clock for counting */
