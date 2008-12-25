@@ -584,7 +584,7 @@ restart:
 			bchbit = 8;
 			eccpos = 3;
 			par_size = 13;
-		} else if (cur_page == spl_size) {
+		} else if (cur_page >= spl_size) {
 			bchbit = bchbit_sav;
 			eccpos = eccpos_sav;
 			par_size = par_size_sav;
@@ -636,6 +636,11 @@ restart:
 			paraddr = (volatile u8 *)BCH_PAR0;
 
 			REG_BCH_INTS = 0xffffffff;
+
+			if (bchbit == 8)
+				__ecc_encoding_8bit();
+			else
+				__ecc_encoding_4bit();
 			
 			/* Set BCHCNT.DEC_COUNT to data block size in bytes */
 			if (option != NO_OOB)
@@ -666,7 +671,7 @@ restart:
 			
 			write_proc((char *)&tmpbuf[ECC_BLOCK * j], ECC_BLOCK);
 		}
-		
+
 		switch (option)
 		{
 		case OOB_ECC:

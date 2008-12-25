@@ -65,7 +65,7 @@ static unsigned int EMC_CSN[4]=
 
 static inline void __nand_sync(void)
 {
-	unsigned int timeout = 60000;
+	unsigned int timeout = 1000;
 	while ((REG_GPIO_PXPIN(2) & 0x40000000) && timeout--);
 	while (!(REG_GPIO_PXPIN(2) & 0x40000000));
 }
