@@ -52,6 +52,7 @@ static int bad_block_pos,bad_block_page,force_erase,ecc_pos,wp_pin;
 extern hand_t Hand;
 //static u8 data_buf[2048] = {0};
 static u8 oob_buf[256] = {0};
+extern u16 handshake_PKT[4];
 
 #define dprintf(x) serial_puts(x)
 
@@ -65,7 +66,7 @@ static unsigned int EMC_CSN[4]=
 
 static inline void __nand_sync(void)
 {
-	unsigned int timeout = 1000;
+	unsigned int timeout = 100000;
 	while ((REG_GPIO_PXPIN(2) & 0x40000000) && timeout--);
 	while (!(REG_GPIO_PXPIN(2) & 0x40000000));
 }
@@ -152,8 +153,8 @@ int nand_init_4740(int bus_width, int row_cycle, int page_size, int page_per_blo
 	}
 	nand_init_gpio();
 	select_chip(0);
-//	REG_EMC_SMCR1 = 0x0fff7700;      //slow speed
-	REG_EMC_SMCR1 = 0x04444400;      //normal speed
+	REG_EMC_SMCR1 = 0x0fff7700;      //slow speed
+//	REG_EMC_SMCR1 = 0x04444400;      //normal speed
 //	REG_EMC_SMCR1 = 0x0d221200;      //fast speed
 
 	if (bus == 8) {
@@ -429,11 +430,12 @@ u32 nand_read_4740(void *buf, u32 startpage, u32 pagenum, int option)
 {
 	u32 j, k;
 	u32 cur_page, cur_blk, cnt, rowaddr, ecccnt;
-	u8 *tmpbuf;
+	u8 *tmpbuf,flag = 0;
 	ecccnt = pagesize / ECC_BLOCK;
 	cur_page = startpage;
 	cnt = 0;
 	tmpbuf = buf;
+	handshake_PKT[3] = 0;
 
 	while (cnt < pagenum) {
 		select_chip(cnt / ppb);
@@ -467,11 +469,15 @@ u32 nand_read_4740(void *buf, u32 startpage, u32 pagenum, int option)
 		for (j = 0; j < ecccnt; j++) {
 			volatile u8 *paraddr = (volatile u8 *)EMC_NFPAR0;
 			u32 stat;
+			flag = 0;
+
 			REG_EMC_NFINTS = 0x0;
 			__nand_ecc_rs_decoding();
 			read_proc(tmpbuf, ECC_BLOCK);
 			for (k = 0; k < PAR_SIZE; k++) {
 				*paraddr++ = oob_buf[ecc_pos + j*PAR_SIZE + k];
+				if (oob_buf[ecc_pos + j*PAR_SIZE + k] != 0xff)
+					flag = 1;
 			}
 			REG_EMC_NFECR |= EMC_NFECR_PRDY;
 			__nand_ecc_decode_sync();
@@ -480,9 +486,15 @@ u32 nand_read_4740(void *buf, u32 startpage, u32 pagenum, int option)
 			stat = REG_EMC_NFINTS;
 			if (stat & EMC_NFINTS_ERR) {
 				if (stat & EMC_NFINTS_UNCOR) {
-//					serial_puts("\nUncorrectable error occurred\n");
+					if (flag)
+					{
+//						serial_puts("\nUncorrectable error occurred\n");
+//						serial_put_hex(cur_page);
+						handshake_PKT[3] = 1;
+					}
 				}
 				else {
+					handshake_PKT[3] = 0;
 					u32 errcnt = (stat & EMC_NFINTS_ERRCNT_MASK) >> EMC_NFINTS_ERRCNT_BIT;
 					switch (errcnt) {
 					case 4:

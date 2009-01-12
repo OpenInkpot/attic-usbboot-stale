@@ -40,6 +40,7 @@ static int bad_block_page = 127; /* Specify the page number of badblock flag ins
 static u32 bad_block_pos = 0;    /* Specify the badblock flag offset inside the oob */
 static u8 oob_buf[256] = {0};
 extern hand_t Hand;
+extern u16 handshake_PKT[4];
 
 static inline void __nand_sync(void)
 {
@@ -401,7 +402,7 @@ u32 nand_read_4750(void *buf, u32 startpage, u32 pagenum, int option)
 {
 	u32 j, k;
 	u32 cur_page, cur_blk, cnt, rowaddr, ecccnt;
-	u8 *tmpbuf, *p;
+	u8 *tmpbuf, *p, flag = 0;
 	u32 oob_per_eccsize;
 
 	ecccnt = pagesize / ECC_BLOCK;
@@ -446,7 +447,7 @@ u32 nand_read_4750(void *buf, u32 startpage, u32 pagenum, int option)
 
 		for (j = 0; j < ecccnt; j++) {
 			u32 stat;
-
+			flag = 0;
 			REG_BCH_INTS = 0xffffffff;
 
 			if (cur_page >= 16384 / pagesize)
@@ -485,6 +486,8 @@ u32 nand_read_4750(void *buf, u32 startpage, u32 pagenum, int option)
 
 			for (k = 0; k < par_size; k++) {
 				REG_BCH_DR = oob_buf[eccpos + j*par_size + k];
+				if (oob_buf[eccpos + j*par_size + k] != 0xff)
+					flag = 1;
 			}
 
 			/* Wait for completion */
@@ -495,9 +498,14 @@ u32 nand_read_4750(void *buf, u32 startpage, u32 pagenum, int option)
 		
 			if (stat & BCH_INTS_ERR) {
 				if (stat & BCH_INTS_UNCOR) {
-					dprintf("Uncorrectable ECC error occurred\n");
+					if (flag)
+					{
+						dprintf("Uncorrectable ECC error occurred\n");
+						handshake_PKT[3] = 1;
+					}
 				}
 				else {
+					handshake_PKT[3] = 0;
 					unsigned int errcnt = (stat & BCH_INTS_ERRC_MASK) >> BCH_INTS_ERRC_BIT;
 					switch (errcnt) {
 					case 8:

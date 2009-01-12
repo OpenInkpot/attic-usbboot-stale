@@ -207,6 +207,7 @@ int NAND_OPS_Handle(u8 *buf)
 		handshake_PKT[1] = (u16) (ret_dat>>16);
 		HW_SendPKT(1,handshake_PKT,sizeof(handshake_PKT));
 		udc_state = IDLE;
+		dprintf("\n Request : NAND_ERASE_FINISH!");
 		break;
 	case NAND_READ:
 		dprintf("\n Request : NAND_READ!");
@@ -224,7 +225,7 @@ int NAND_OPS_Handle(u8 *buf)
 			ret_dat = nand_read(Bulk_in_buf,start_addr,ops_length,OOB_NO_ECC);
 			handshake_PKT[0] = (u16) ret_dat;
 			handshake_PKT[1] = (u16) (ret_dat>>16);
-			HW_SendPKT(1,(u8 *)Bulk_in_buf,ops_length*(Hand.nand_ps + Hand.nand_os ));
+			HW_SendPKT(1,(u8 *)Bulk_in_buf,ops_length*(Hand.nand_ps + Hand.nand_os));
 			udc_state = BULK_IN;
 			break;
 		case 	NO_OOB:
@@ -235,7 +236,7 @@ int NAND_OPS_Handle(u8 *buf)
 			udc_state = BULK_IN;
 			break;
 		}
-
+		dprintf("\n Request : NAND_READ_FUNISH!");
 		break;
 	case NAND_PROGRAM:
 		dprintf("\n Request : NAND_PROGRAM!");
