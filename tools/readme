@@ -1,0 +1,10 @@
+
+Before use this tool, please rename USBBoot_PAVO.cfg or USBBoot_APUS.cfg to USBBoot.cfg.
+
+USBBoot_PAVO.cfg is a sample cfg file for PAVO board.
+
+USBBoot_APUS.cfg is a sample cfg file for APUS board.
+
+Usb_Boot_Driver.inf and Usb_Boot_Driver.sys are the usb driver files for windows XP/2K.
+
+
