@@ -23,9 +23,6 @@ CFLAGS	:= -mips32 -O2  -FPIC \
 #CFLAGS	:= -mips32 -O2  -FPIC -mno-abicalls -fno-builtin \
 
 LDFLAGS	:= -nostdlib -T target.ld $(CFLAGS)
-#-FPIC
-#-fno-pic
-#-FPIC
 
 LIBS	:= -lstdc++ -lc -lm -lgcc
 
@@ -56,6 +53,7 @@ all:	$(APP)
 	$(OBJDUMP) -D $(APP) > $(TARGET).dump
 	$(NM) $(APP) | sort > $(TARGET).sym
 	$(OBJDUMP) -h $(APP) > $(TARGET).map
+	cp usb_boot.bin ../../../tools
 
 $(APP):	$(HEADO) $(OBJS) $(EXTLIBS) 
 	$(CC) $(LDFLAGS) $^ -o $@
