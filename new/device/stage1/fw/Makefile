@@ -18,7 +18,7 @@ fw.bin: fw.elf
 	$(CROSS)objdump -D $< > fw.dump
 	$(CROSS)objdump -h $< > fw.map
 	$(CROSS)nm -n $< > System.map
-#	$(CROSS)strip -Ibinary fw.bin
+	cp fw.bin ../../../tools
 
 fw.elf: $(OBJS)
 	$(CROSS)ld $(LDFLAGS) $(OBJS) -o $@
@@ -28,4 +28,3 @@ fw.elf: $(OBJS)
 	$(CROSS)gcc $(CFLAGS) -c $< -o $@
 clean:
 	rm -fr *.o *.elf *.bin *.dump *.map
-

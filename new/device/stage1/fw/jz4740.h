@@ -21,7 +21,7 @@ typedef unsigned int u32;
 #include <cacheops.h>
 #define KSEG0 KSEG0BASE
 #else
-#include <asm/cacheops.h>
+//#include <asm/cacheops.h>
 #endif
 
 #define cache_unroll(base,op)	        	\
