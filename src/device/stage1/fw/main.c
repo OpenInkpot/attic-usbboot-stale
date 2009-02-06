@@ -44,7 +44,7 @@ void test_load_args(void)
 
 void load_args(void)
 {
-	fw_args = (fw_args_t *)0x80000008;       //get the fw args from memory
+	fw_args = (fw_args_t *)0x80002008;       //get the fw args from memory
 	CPU_ID = fw_args->cpu_id ;
 	CFG_EXTAL = (u32)fw_args->ext_clk * 1000000;
 	CFG_CPU_SPEED = (u32)fw_args->cpu_speed * CFG_EXTAL ;
