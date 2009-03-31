@@ -560,7 +560,7 @@ restart:
 	while (i < pages) {
 		select_chip(cur / ppb);
 #if 1
-		if ((pagesize == 4096) && (cur < 8)) {
+		if (cur < 8) {
 			ecccnt = 4;
 			oobsize = 64;
 			ecc_pos = 6;
