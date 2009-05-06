@@ -1,10 +1,53 @@
+The USB boot tool is used to program the NAND flash, download firmware to the
+target board to execute, and test your hardware problems etc. It can also be
+used to upgrade the code and data of your product.
 
-Before use this tool, please rename USBBoot_PAVO.cfg or USBBoot_APUS.cfg to USBBoot.cfg.
+The tool package includes these files:
 
-USBBoot_PAVO.cfg is a sample cfg file for PAVO board.
+USB_Boot.exe: an executable file, you can run the commands of the tools after executing it.
+fw.bin: a binary file used to initialize the hardware of the board.
+usb_boot.bin: a binary file used to perform the NAND programming and hardware test functionality.
+Usb_Boot_Driver.sys: the driver file used for Windows 2000/XP/Vista.
+Usb_Boot_Driver.inf: the driver information file.
+USBBoot.cfg: the configuration file used by the USB boot tool.
+USBBoot_BOARD.cfg: example configuration files for various boards.
 
-USBBoot_APUS.cfg is a sample cfg file for APUS board.
+First of all, you should install the driver when you boot the device from USB for the first time.
 
-Usb_Boot_Driver.inf and Usb_Boot_Driver.sys are the usb driver files for windows XP/2K.
+Then click USB_Boot.exe to start the tool. It's a command line tool, type 'help' to get all the
+supported commands. More help can be found in the <USB_Boot_Tool_Manual.pdf>.
 
+Before starting, you should open the USBBoot.cfg file to check the configuration values and
+be sure that it's correct for your target board.
 
+Then copy the file that you want to program to the tools\ directory.
+
+Following are simple steps to program the NAND flash:
+
+USBBoot :> boot 0
+...
+Boot success!
+...
+Configure success!
+
+USBBoot :> nquery 0 0
+
+ID of No.0 device No.0 flash:
+Vendor ID  :0xec
+Product ID :0xd5
+Chip ID    :0x14
+Page ID    :0xb6
+Plane ID   :0x74
+Operation status: Success!
+
+USBBoot :> nprog 0 u-boot-nand.bin 0 0 -n
+
+Programming No.0 device...
+Erasing No.0 device No.0 flash...... Finish!
+Operation end position: 2
+Force erase, no bad block information!
+Total size to send in byte is: 471296
+Image type: without oob
+It will cause 2 times buffer transfer.
+No.1 Programming... Finish! Checking...pass! End at 128
+No.2 Programming... Finish! Checking...pass! End at 231
