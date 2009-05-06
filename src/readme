@@ -23,8 +23,7 @@ Device part
 	The device source can divided into two part:
 	1.stage1
 	2.stage2
-	To build these two part you may have a no-pic compiler.
-	To obtain the compiler at ftp://ftp.ingenic.cn/3sw/01linux/00toolchain/no-pic/jz-nopic-lnx-cc20060922.tgz
+	To obtain the compiler from Ingenic ftp server.
 
 	Stage1:
 	First enable the no-pic compiler show as above.
