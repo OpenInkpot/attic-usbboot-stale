@@ -105,6 +105,6 @@ Usb_Boot_Driver.sys
 [Strings]
 ProviderName="Ingenic Semiconductor"
 MfgName="Ingenic Semiconductor"
-DeviceDesc="XXXXXXXX"
-DeviceClassName="YYYYYYYYY"
-SvcDesc="ZZZZZZZZZ"
+DeviceDesc="Usb Boot Device"
+DeviceClassName="Ingenic Usb Boot Class"
+SvcDesc="version 1.4b"
