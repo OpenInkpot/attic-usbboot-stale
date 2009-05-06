@@ -30,6 +30,10 @@ extern udc_state;
 extern void *memset(void *, int , size_t);
 extern void *memcpy(void *, const void *, size_t);
 
+extern int mmc_init(void);
+extern int mmc_block_readm(u32 , u32 , u8 *);
+extern int mmc_block_writem(u32 , u32 , u8 *);
+
 u32 ret_dat;
 u32 start_addr;  //program operation start address or sector
 u32 ops_length;  //number of operation unit ,in byte or sector
@@ -257,6 +261,19 @@ int NAND_OPS_Handle(u8 *buf)
 		HW_SendPKT(1,handshake_PKT,sizeof(handshake_PKT));
 		udc_state = IDLE;
 		break;
+	case SD_PROGRAM:
+		dprintf("\n Request : SD_PROG!");
+		mmc_block_writem(start_addr, ops_length * 512, (u8 *)Bulk_out_buf);
+		handshake_PKT[3]=(u16)ERR_OK;
+		HW_SendPKT(1,handshake_PKT,sizeof(handshake_PKT));
+		udc_state = IDLE;
+		break;
+	case SD_READ:
+		dprintf("\n Request : SD_READ!");
+		mmc_block_readm(start_addr, ops_length * 512, (u8 *)Bulk_in_buf);
+		HW_SendPKT(1, (u8 *)Bulk_in_buf, ops_length * 512);
+		udc_state = IDLE;
+		break;
 	default:
 		nand_disable(CSn);
 		return ERR_OPS_NOTSUPPORT;
@@ -321,6 +338,8 @@ void Borad_Init()
 		nand_enable = nand_enable_4750;
 		nand_disable= nand_disable_4750;
 		nand_mark_bad = nand_mark_bad_4750;
+		mmc_init();
+
 	break;
 	default:
 		serial_puts("Not support CPU ID!");

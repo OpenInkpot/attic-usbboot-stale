@@ -35,6 +35,7 @@ LIBDIR	:=
 SOURCES := ./usb_boot/main.c ./usb_boot/udc.c ./usb_boot/cache.c ./usb_boot/serial.c ./usb_boot/boothandler.c
 SOURCES += $(wildcard $(USBBOOTDIR)/nandflash/*.c) 
 SOURCES	+= $(wildcard $(USBBOOTDIR)/usb_boot/*.S)
+SOURCES	+= $(wildcard $(USBBOOTDIR)/sdcard/*.c)
 
 HEADS	:= $(SOCDIR)/head.S 
 
@@ -46,7 +47,7 @@ HEADO	:= $(addsuffix .o , $(basename $(notdir $(HEADS))))
 TARGET  := usb_boot
 APP	:= $(TARGET).elf 
 
-VPATH	:= $(ARCHDIR) $(SOCDIR) $(OSDIR) $(USBBOOTDIR)/usb_boot  $(USBBOOTDIR)/norflash $(USBBOOTDIR)/nandflash 
+VPATH	:= $(ARCHDIR) $(SOCDIR) $(OSDIR) $(USBBOOTDIR)/usb_boot  $(USBBOOTDIR)/norflash $(USBBOOTDIR)/nandflash  $(USBBOOTDIR)/sdcard
 
 all:	$(APP)
 	$(OBJCOPY) -O binary $(APP) $(TARGET).bin
