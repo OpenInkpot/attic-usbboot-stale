@@ -10,13 +10,47 @@
 #include "jz4750.h"
 #include "configs.h"
 
+#define PROID_4750 0x1ed0024f
+
+#define read_32bit_cp0_processorid()                            \
+({ int __res;                                                   \
+        __asm__ __volatile__(                                   \
+        "mfc0\t%0,$15\n\t"                                      \
+        : "=r" (__res));                                        \
+        __res;})
+
+void gpio_as_uart0_4755()
+{
+	REG_GPIO_PXFUNS(3) = 0x30000000;
+	REG_GPIO_PXSELC(3) = 0x30000000;
+	REG_GPIO_PXPES(3) = 0x30000000;	
+}
+
+void gpio_as_uart1_4755()
+{
+	REG_GPIO_PXTRGC(4) = 0x02800000;
+	REG_GPIO_PXFUNS(4) = 0x02800000;
+	REG_GPIO_PXSELS(4) = 0x02800000;
+	REG_GPIO_PXPES(4) = 0x02800000;	
+}
+
 void gpio_init_4750(void)
 {
+	unsigned int processor_id = read_32bit_cp0_processorid();
 	__gpio_as_sdram_32bit();
-	__gpio_as_uart1();
-	__gpio_as_uart0();
-	__gpio_as_uart2();
-	__gpio_as_uart3();
+	if (processor_id == PROID_4750)
+	{
+		__gpio_as_uart1();
+		__gpio_as_uart0();
+		__gpio_as_uart2();
+		__gpio_as_uart3();
+	}
+	else
+	{
+		REG_CPM_CLKGR = 0x0;
+		gpio_as_uart0_4755();
+		gpio_as_uart1_4755();
+	}
 	__gpio_as_nand_8bit();
 }
 
