@@ -262,16 +262,44 @@ static void sd_init(void)
 	resp = mmc_cmd(6, 0x2, 0x401, MSC_CMDAT_RESPONSE_R1);
 }
 
+#define PROID_4750 0x1ed0024f
+
+#define read_32bit_cp0_processorid()                            \
+({ int __res;                                                   \
+        __asm__ __volatile__(                                   \
+        "mfc0\t%0,$15\n\t"                                      \
+        : "=r" (__res));                                        \
+        __res;})
+
+void gpio_as_msc0_4bit()
+{
+	REG_GPIO_PXFUNS(1) = 0x00008000;
+	REG_GPIO_PXTRGS(1) = 0x00008000;
+	REG_GPIO_PXSELC(1) = 0x00008000;
+	REG_GPIO_PXPES(1)  = 0x00008000;
+	REG_GPIO_PXFUNS(2) = 0x38030000;
+	REG_GPIO_PXTRGS(2) = 0x00010000;
+	REG_GPIO_PXTRGC(2) = 0x38020000;
+	REG_GPIO_PXSELC(2) = 0x08010000;
+	REG_GPIO_PXSELS(2) = 0x30020000;
+	REG_GPIO_PXPES(2)  = 0x38030000;
+}
+
 /* init mmc/sd card we assume that the card is in the slot */
 int  mmc_init(void)
 {
 	int retries, wait;
 	u8 *resp;
+	unsigned int processor_id = read_32bit_cp0_processorid();
 
 	REG_CPM_MSCCDR(0) = 13;
 	REG_CPM_CPCCR |= CPM_CPCCR_CE;
 
-	__gpio_as_msc0_8bit();
+	if (processor_id == PROID_4750)
+		__gpio_as_msc0_8bit();
+	else
+		gpio_as_msc0_4bit();
+
 	__msc_reset();
 	MMC_IRQ_MASK();	
 	REG_MSC_CLKRT = 7;    //187k
