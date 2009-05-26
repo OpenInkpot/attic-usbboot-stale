@@ -34,14 +34,14 @@ void gpio_test(unsigned char ops, unsigned char pin)
 	__gpio_as_output(pin);
 	if (ops)
 	{
-		serial_puts("\nGPIO set ");
-		serial_put_hex(pin);
+//		serial_puts("\nGPIO set ");
+//		serial_put_hex(pin);
 		__gpio_set_pin(pin);
 	}
 	else
 	{
-		serial_puts("\nGPIO clear ");
-		serial_put_hex(pin);
+//		serial_puts("\nGPIO clear ");
+//		serial_put_hex(pin);
 		__gpio_clear_pin(pin);
 	}
 //	__gpio_as_input(pin);
