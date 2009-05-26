@@ -151,7 +151,13 @@ int NAND_OPS_Handle(u8 *buf)
 
 	CSn = (dreq->wValue>>4) & 0xff;
 	option = (dreq->wValue>>12) & 0xff;
-	nand_enable(CSn);
+
+	if (((dreq->wValue)&0xf) == SD_PROGRAM ||
+	    ((dreq->wValue)&0xf) == SD_READ)
+		mmc_init_gpio();
+	else
+		nand_enable(CSn);
+
 	switch ((dreq->wValue)&0xf)
 	{
 	case NAND_QUERY:

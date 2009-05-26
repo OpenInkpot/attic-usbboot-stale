@@ -285,20 +285,29 @@ void gpio_as_msc0_4bit()
 	REG_GPIO_PXPES(2)  = 0x38030000;
 }
 
+
+void mmc_init_gpio(void)
+{
+	unsigned int processor_id = read_32bit_cp0_processorid();
+
+	if (processor_id == PROID_4750)
+		__gpio_as_msc0_8bit();
+	else if (processor_id != 0x0ad0024f)
+		gpio_as_msc0_4bit();
+
+}
+
 /* init mmc/sd card we assume that the card is in the slot */
 int  mmc_init(void)
 {
 	int retries, wait;
 	u8 *resp;
-	unsigned int processor_id = read_32bit_cp0_processorid();
+
 
 	REG_CPM_MSCCDR(0) = 13;
 	REG_CPM_CPCCR |= CPM_CPCCR_CE;
 
-	if (processor_id == PROID_4750)
-		__gpio_as_msc0_8bit();
-	else
-		gpio_as_msc0_4bit();
+	mmc_init_gpio();
 
 	__msc_reset();
 	MMC_IRQ_MASK();	

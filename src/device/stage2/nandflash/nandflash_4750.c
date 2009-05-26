@@ -5,6 +5,45 @@
 
 #define dprintf(n...)
 
+void gpio_as_nand_8bit(int n)
+{		              	
+	/* 32/16-bit data bus */
+	REG_GPIO_PXFUNS(0) = 0x000000ff; /* D0~D7 */			
+	REG_GPIO_PXSELC(0) = 0x000000ff;				
+	REG_GPIO_PXPES(0) = 0x000000ff;					
+	REG_GPIO_PXFUNS(1) = 0x00008000; /* CLE(A15) */			
+	REG_GPIO_PXSELC(1) = 0x00008000;				
+	REG_GPIO_PXPES(1) = 0x00008000;					
+	REG_GPIO_PXFUNS(2) = 0x00010000; /* ALE(A16) */			
+	REG_GPIO_PXSELC(2) = 0x00010000;				
+	REG_GPIO_PXPES(2) = 0x00010000;					
+									
+	REG_GPIO_PXFUNS(2) = 0x00200000 << ((n)-1); /* CSn */		
+	REG_GPIO_PXSELC(2) = 0x00200000 << ((n)-1);			
+	REG_GPIO_PXPES(2) = 0x00200000 << ((n)-1);			
+									
+        REG_GPIO_PXFUNS(1) = 0x00080000; /* RDWE#/BUFD# */		
+        REG_GPIO_PXSELC(1) = 0x00080000;				
+	REG_GPIO_PXPES(1) = 0x00080000;					
+	REG_GPIO_PXFUNS(2) = 0x30000000; /* FRE#, FWE# */		
+	REG_GPIO_PXSELC(2) = 0x30000000;				
+	REG_GPIO_PXPES(2) = 0x30000000;					
+	REG_GPIO_PXFUNC(2) = 0x08000000; /* FRB#(input) */		
+	REG_GPIO_PXSELC(2) = 0x08000000;				
+	REG_GPIO_PXDIRC(2) = 0x08000000;				
+	REG_GPIO_PXPES(2) = 0x08000000;				
+	REG_GPIO_PXTRGC(1) = 0xffffffff;	
+	REG_GPIO_PXTRGC(2) = 0xffffffff;
+}
+#define PROID_4750 0x1ed0024f
+
+#define read_32bit_cp0_processorid()                            \
+({ int __res;                                                   \
+        __asm__ __volatile__(                                   \
+        "mfc0\t%0,$15\n\t"                                      \
+        : "=r" (__res));                                        \
+        __res;})
+
 #define __nand_enable()		(REG_EMC_NFCSR |= EMC_NFCSR_NFE1 | EMC_NFCSR_NFCE1)
 #define __nand_disable()	(REG_EMC_NFCSR &= ~(EMC_NFCSR_NFCE1))
 #define __nand_ready()		((REG_GPIO_PXPIN(2) & 0x08000000) ? 1 : 0)
@@ -60,11 +99,16 @@ static int (*read_proc)(char *, int) = NULL;
 
 inline void nand_enable_4750(unsigned int csn)
 {
+	unsigned int processor_id = read_32bit_cp0_processorid();
 	//modify this fun to a specifical borad
 	//this fun to enable the chip select pin csn
 	//the choosn chip can work after this fun
 	//dprintf("\n Enable chip select :%d",csn);
 	__nand_enable();
+//	if (processor_id == PROID_4750)
+//		__gpio_as_nand_8bit();
+//	else
+		gpio_as_nand_8bit(1);
 }
 
 inline void nand_disable_4750(unsigned int csn)
