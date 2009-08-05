@@ -4,7 +4,7 @@
 #include "hand.h"
 
 #define dprintf(n...)
-
+#if 0
 void gpio_as_nand_8bit(int n)
 {		              	
 	/* 32/16-bit data bus */
@@ -35,6 +35,7 @@ void gpio_as_nand_8bit(int n)
 	REG_GPIO_PXTRGC(1) = 0xffffffff;	
 	REG_GPIO_PXTRGC(2) = 0xffffffff;
 }
+#endif
 #define PROID_4750 0x1ed0024f
 
 #define read_32bit_cp0_processorid()                            \
@@ -108,7 +109,7 @@ inline void nand_enable_4750(unsigned int csn)
 //	if (processor_id == PROID_4750)
 //		__gpio_as_nand_8bit();
 //	else
-		gpio_as_nand_8bit(1);
+//		gpio_as_nand_8bit(1);
 }
 
 inline void nand_disable_4750(unsigned int csn)
@@ -163,6 +164,16 @@ int nand_init_4750(int bus_width, int row_cycle, int page_size, int page_per_blo
 	dataport = (u8 *)dport;
 	cmdport = (u8 *)cport;
 #endif
+	if(is_share_mode()) {
+		serial_puts("nand share mode\n");
+		addrport = (volatile unsigned char *)0xb8010000;
+		cmdport = (volatile unsigned char *)0xb8008000;
+	} else {
+		serial_puts("nand unshare mode\n");
+		addrport = (volatile unsigned char *)0xb8000010;
+		cmdport = (volatile unsigned char *)0xb8000008;
+	}
+
 	/* Initialize NAND Flash Pins */
 	if (bus == 8) {
 		__gpio_as_nand_8bit();

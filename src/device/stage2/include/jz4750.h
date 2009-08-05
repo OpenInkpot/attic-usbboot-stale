@@ -2935,6 +2935,8 @@ static inline u32 jz_readl(u32 address)
 
 //----------------------------------------------------------------
 // Function Pins Mode
+#define is_share_mode() ((REG_EMC_BCR & EMC_BCR_BSR_MASK) == EMC_BCR_BSR_SHARE)
+#define is_normal_order() (!(REG_EMC_BCR & EMC_BCR_PK_SEL))
 
 #define __gpio_as_func0(n)			\
 do {						\
@@ -3022,21 +3024,51 @@ do {						\
 /*
  * D0 ~ D7, CS1#, CLE, ALE, FRE#, FWE#, FRB#, RDWE#/BUFD#
  */
-#define __gpio_as_nand_8bit()			\
-do {						\
-	REG_GPIO_PXFUNS(0) = 0x000000ff;	\
-	REG_GPIO_PXSELC(0) = 0x000000ff;	\
-	REG_GPIO_PXPES(0) = 0x000000ff;		\
-	REG_GPIO_PXFUNS(1) = 0x00088000;	\
-	REG_GPIO_PXSELC(1) = 0x00088000;	\
-	REG_GPIO_PXPES(1) = 0x00088000;	        \
-	REG_GPIO_PXFUNS(2) = 0x30210000;	\
-	REG_GPIO_PXSELC(2) = 0x30210000;	\
-	REG_GPIO_PXPES(2) = 0x30210000;	        \
-	REG_GPIO_PXFUNC(2) = 0x08000000;	\
-	REG_GPIO_PXSELC(2) = 0x08000000;	\
-	REG_GPIO_PXDIRC(2) = 0x08000000;        \
-	REG_GPIO_PXPES(2) = 0x08000000;	        \
+#define __gpio_as_nand_8bit()						\
+do {		              						\
+	if (!is_share_mode()) {						\
+		/* unshare mode */					\
+		REG_GPIO_PXFUNS(2) = 0x000000ff; /* SD0~SD7 */		\
+		REG_GPIO_PXSELC(2) = 0x000000ff;			\
+		REG_GPIO_PXPES(2) = 0x000000ff;				\
+		REG_GPIO_PXFUNS(1) = 0x00008000; /* CLE(SA3) */		\
+		REG_GPIO_PXSELS(1) = 0x00008000;			\
+		REG_GPIO_PXPES(1) = 0x00008000;				\
+		REG_GPIO_PXFUNS(2) = 0x00010000; /* ALE(SA4) */		\
+		REG_GPIO_PXSELS(2) = 0x00010000;			\
+		REG_GPIO_PXPES(2) = 0x00010000;				\
+	} else {							\
+		/* share mode */					\
+		if (is_normal_order()) {	              		\
+			/* 32/16-bit data normal order */		\
+			REG_GPIO_PXFUNS(0) = 0x000000ff; /* D0~D7 */	\
+			REG_GPIO_PXSELC(0) = 0x000000ff;		\
+			REG_GPIO_PXPES(0) = 0x000000ff;			\
+		} else {						\
+			/* 16-bit data special order */			\
+			REG_GPIO_PXFUNS(0) = 0x0000ff00; /* D0~D7 */	\
+			REG_GPIO_PXSELC(0) = 0x0000ff00;		\
+			REG_GPIO_PXPES(0) = 0x0000ff00;			\
+		}							\
+		REG_GPIO_PXFUNS(1) = 0x00008000; /* CLE(A15) */		\
+		REG_GPIO_PXSELC(1) = 0x00008000;			\
+		REG_GPIO_PXPES(1) = 0x00008000;				\
+		REG_GPIO_PXFUNS(2) = 0x00010000; /* ALE(A16) */		\
+		REG_GPIO_PXSELC(2) = 0x00010000;			\
+		REG_GPIO_PXPES(2) = 0x00010000;				\
+	}								\
+									\
+	REG_GPIO_PXFUNS(2) = 0x00200000; /* CS1 */			\
+        REG_GPIO_PXFUNS(1) = 0x00080000; /* RDWE#/BUFD# */		\
+        REG_GPIO_PXSELC(1) = 0x00080000;				\
+	REG_GPIO_PXPES(1) = 0x00080000;					\
+	REG_GPIO_PXFUNS(2) = 0x30000000; /* FRE#, FWE# */		\
+	REG_GPIO_PXSELC(2) = 0x30000000;				\
+	REG_GPIO_PXPES(2) = 0x30000000;					\
+	REG_GPIO_PXFUNC(2) = 0x08000000; /* FRB#(input) */		\
+	REG_GPIO_PXSELC(2) = 0x08000000;				\
+	REG_GPIO_PXDIRC(2) = 0x08000000;				\
+	REG_GPIO_PXPES(2) = 0x08000000;					\
 } while (0)
 
 /*
