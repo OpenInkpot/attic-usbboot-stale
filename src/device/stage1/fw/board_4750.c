@@ -37,6 +37,13 @@ void gpio_as_uart1_4755()
 void gpio_init_4750(void)
 {
 	unsigned int processor_id = read_32bit_cp0_processorid();
+
+	if(IS_SHARE) {
+		REG_EMC_BCR &= ~EMC_BCR_BSR_UNSHARE;
+	} else {
+		REG_EMC_BCR |= EMC_BCR_BSR_UNSHARE;
+	}
+
 	__gpio_as_sdram_32bit();
 	if (processor_id == PROID_4750)
 	{
@@ -151,8 +158,7 @@ void sdram_init_4750(void)
 
 	/* set REG_EMC_DMAR0 for supporting 128MB sdram on DCS0 */
 	REG_EMC_DMAR0 = EMC_DMAR0_BASE | EMC_DMAR_MASK_128_128;
-
-	REG_EMC_BCR = 0;	/* Disable bus release */
+	REG_EMC_BCR &= ~EMC_BCR_BRE;	/* Disable bus release */
 	REG_EMC_RTCSR = 0;	/* Disable clock for counting */
 
 	/* Basic DMCR value */
