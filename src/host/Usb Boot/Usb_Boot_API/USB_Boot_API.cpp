@@ -1154,7 +1154,9 @@ int API_SD_Program_File(NAND_IN *nand_in,NAND_OUT *nand_out,char *fname)
 
 		if (j)
 		{
-			j += 512 - (j % 512);
+			if (j % 512 != 0)
+				j = (j / 512 + 1) * 512;
+
 			memset(code_buf,0,j);				//set all to null
 			fread(code_buf,1,j,fp);						//read code from file to buffer
 			nand_in->length = j;
@@ -1262,7 +1264,17 @@ int API_Nand_Program_File(NAND_IN *nand_in,NAND_OUT *nand_out,char *fname)
 
 		if (j)
 		{
-			j += Hand.nand_ps - (j%Hand.nand_ps);
+			if (nand_in->option == NO_OOB)
+			{
+				if (j % Hand.nand_ps != 0)
+					j = (j / Hand.nand_ps + 1) * Hand.nand_ps;
+			}
+			else
+			{
+				if (j % (Hand.nand_ps + Hand.nand_os) != 0)
+					j = (j / (Hand.nand_ps + Hand.nand_os) + 1) * (Hand.nand_ps + Hand.nand_os);
+			}
+
 			memset(code_buf,0,j);				//set all to null
 			fread(code_buf,1,j,fp);						//read code from file to buffer
 			nand_in->length = j;
