@@ -4,7 +4,7 @@
 #include "hand.h"
 
 #define dprintf(n...)
-#if 0
+#if 1
 void gpio_as_nand_8bit(int n)
 {		              	
 	/* 32/16-bit data bus */
@@ -106,10 +106,10 @@ inline void nand_enable_4750(unsigned int csn)
 	//the choosn chip can work after this fun
 	//dprintf("\n Enable chip select :%d",csn);
 	__nand_enable();
-//	if (processor_id == PROID_4750)
-//		__gpio_as_nand_8bit();
-//	else
-//		gpio_as_nand_8bit(1);
+	if (processor_id == PROID_4750)
+		__gpio_as_nand_8bit();
+	else
+		gpio_as_nand_8bit(1);
 }
 
 inline void nand_disable_4750(unsigned int csn)
