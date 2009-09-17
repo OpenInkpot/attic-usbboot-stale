@@ -43,6 +43,28 @@ do {						\
 	REG_MSC_IREG = 0xffff;			\
 } while (0)
 
+static sd_mdelay(int sdelay)
+{
+	__tcu_set_count(0,0);
+	__tcu_disable_pwm_output(0);
+	__tcu_select_rtcclk(0);
+	__tcu_select_clk_div1(0);
+
+	__tcu_mask_half_match_irq(0); 
+	__tcu_mask_full_match_irq(0);
+
+	REG_TCU_TDFR(0) = 32; // 1 ms 
+	__tcu_start_counter(0);
+
+	while(1) {
+		if(REG_TCU_TCNT(0) > sdelay)
+			break;
+	}
+
+	__tcu_stop_counter(0);
+	__tcu_stop_timer_clock(0);
+}
+
 /* Stop the MMC clock and wait while it happens */
 static inline int jz_mmc_stop_clock(void)
 {
@@ -234,13 +256,11 @@ static void sd_init(void)
 	serial_puts("SD card found!\n");
 
 	resp = mmc_cmd(41, 0x40ff8000, 0x3, MSC_CMDAT_RESPONSE_R3);
-	retries = 100;
+	retries = 200;
 	while (retries-- && resp && !(resp[4] & 0x80)) {
 		resp = mmc_cmd(55, 0, 0x1, MSC_CMDAT_RESPONSE_R1);
 		resp = mmc_cmd(41, 0x40ff8000, 0x3, MSC_CMDAT_RESPONSE_R3);
-		wait = 33600000; // mdelay(100);
-		while (wait--)
-			;
+		sd_mdelay(10);
 	}
 
 	if (resp[4] & 0x80) 
@@ -322,12 +342,10 @@ int  mmc_init(void)
 	if(!(resp[0] & 0x20) && (resp[5] != 0x37)) { 
 		serial_puts("MMC card found!\n");
 		resp = mmc_cmd(1, 0xff8000, 0x3, MSC_CMDAT_RESPONSE_R3);
-		retries = 100;
+		retries = 200;
 		while (retries-- && resp && !(resp[4] & 0x80)) {
 			resp = mmc_cmd(1, 0x40300000, 0x3, MSC_CMDAT_RESPONSE_R3);
-			wait = 33600000; // mdelay(100);
-			while (wait--)
-				;
+			sd_mdelay(10);
 		}
 
 		if (resp[4]== 0x80) 
