@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2007 Ingenic Semiconductor Inc.
- * Author: Peter <jlwei@ingenic.cn>
+ * Copyright (C) 2009 Ingenic Semiconductor Inc.
+ * Author: Taylor <cwjia@ingenic.cn>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -193,13 +193,17 @@ int mmc_block_readm(u32 src, u32 num, u8 *dst)
 	resp = mmc_cmd(12, 0, 0x41, MSC_CMDAT_RESPONSE_R1);
 	jz_mmc_stop_clock();
 
+	while (!(REG_MSC_IREG & MSC_IREG_PRG_DONE))
+		;
+	REG_MSC_IREG = MSC_IREG_PRG_DONE;	/* clear status */
+
 	return 0;
 }
 
 int mmc_block_writem(u32 src, u32 num, u8 *dst)
 {
 	u8 *resp;
-	u32 stat, timeout, data, cnt, wait, nob, i;
+	u32 stat, timeout, data, cnt, wait, nob, i, j;
 	u32 *wbuf = (u32 *)dst;
 
 	resp = mmc_cmd(16, 0x200, 0x401, MSC_CMDAT_RESPONSE_R1);
@@ -236,14 +240,20 @@ int mmc_block_writem(u32 src, u32 num, u8 *dst)
 		/* Write data to TXFIFO */
 		cnt = 128;
 		while (cnt) {
-			while (REG_MSC_STAT & MSC_STAT_DATA_FIFO_FULL)
+			while(!(REG_MSC_IREG & MSC_IREG_TXFIFO_WR_REQ))
 				;
-			REG_MSC_TXFIFO = *wbuf++;
-			cnt--;
+			for (j=0; j<8; j++)
+			{	
+				REG_MSC_TXFIFO = *wbuf++;
+				cnt--;
+			}
 		}
 	}
 
 	resp = mmc_cmd(12, 0, 0x441, MSC_CMDAT_RESPONSE_R1);
+	while (!(REG_MSC_IREG & MSC_IREG_PRG_DONE))
+		;
+	REG_MSC_IREG = MSC_IREG_PRG_DONE;	/* clear status */
 	jz_mmc_stop_clock();
 	return 0;
 }
