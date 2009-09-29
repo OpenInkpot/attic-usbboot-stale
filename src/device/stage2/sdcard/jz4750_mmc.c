@@ -266,7 +266,7 @@ static void sd_init(void)
 	serial_puts("SD card found!\n");
 
 	resp = mmc_cmd(41, 0x40ff8000, 0x3, MSC_CMDAT_RESPONSE_R3);
-	retries = 200;
+	retries = 1000;
 	while (retries-- && resp && !(resp[4] & 0x80)) {
 		resp = mmc_cmd(55, 0, 0x1, MSC_CMDAT_RESPONSE_R1);
 		resp = mmc_cmd(41, 0x40ff8000, 0x3, MSC_CMDAT_RESPONSE_R3);
@@ -345,6 +345,9 @@ int  mmc_init(void)
 
 	serial_puts("\n\nMMC/SD INIT\n");
 
+	/* just for reading and writing, suddenly it was reset, and the power of sd card was not broken off */
+	resp = mmc_cmd(12, 0, 0x41, MSC_CMDAT_RESPONSE_R1);
+
 	/* reset */
 	resp = mmc_cmd(0, 0, 0x80, 0);
 	resp = mmc_cmd(8, 0x1aa, 0x1, MSC_CMDAT_RESPONSE_R1);
@@ -352,7 +355,7 @@ int  mmc_init(void)
 	if(!(resp[0] & 0x20) && (resp[5] != 0x37)) { 
 		serial_puts("MMC card found!\n");
 		resp = mmc_cmd(1, 0xff8000, 0x3, MSC_CMDAT_RESPONSE_R3);
-		retries = 200;
+		retries = 1000;
 		while (retries-- && resp && !(resp[4] & 0x80)) {
 			resp = mmc_cmd(1, 0x40300000, 0x3, MSC_CMDAT_RESPONSE_R3);
 			sd_mdelay(10);
