@@ -106,9 +106,12 @@ inline void nand_enable_4750(unsigned int csn)
 	//the choosn chip can work after this fun
 	//dprintf("\n Enable chip select :%d",csn);
 	__nand_enable();
-	if (processor_id == PROID_4750)
-		__gpio_as_nand_8bit();
-	else
+	if (processor_id == PROID_4750) {
+		if (bus == 8)
+			__gpio_as_nand_8bit();
+		else
+			__gpio_as_nand_16bit();
+	} else
 		gpio_as_nand_8bit(1);
 }
 
@@ -176,7 +179,19 @@ int nand_init_4750(int bus_width, int row_cycle, int page_size, int page_per_blo
 
 	/* Initialize NAND Flash Pins */
 	if (bus == 8) {
+		serial_puts("8bit bus width\n");
+		//REG_EMC_SMCR1 = 0x0fff7700;      //slow speed
+		REG_EMC_SMCR1 = 0x04444400;      //normal speed
+		//REG_EMC_SMCR1 = 0x0d221200;      //fast speed
+
 		__gpio_as_nand_8bit();
+	} else {
+		serial_puts("16bit bus width\n");
+		REG_EMC_SMCR1 = 0x0fff7740;      //slow speed
+		//REG_EMC_SMCR1 = 0x04444440;      //normal speed
+		//REG_EMC_SMCR1 = 0x0d221240;      //fast speed
+
+		__gpio_as_nand_16bit();
 	}
 
 	if (wp_pin)
@@ -185,10 +200,6 @@ int nand_init_4750(int bus_width, int row_cycle, int page_size, int page_per_blo
 		__gpio_disable_pull(wp_pin);
 	}
 	__nand_enable();
-
-//	REG_EMC_SMCR1 = 0x0fff7700;      //slow speed
-	REG_EMC_SMCR1 = 0x04444400;      //normal speed
-//	REG_EMC_SMCR1 = 0x0d221200;      //fast speed
 
        /* If ECCPOS isn't configured in config file, the initial value is 0 */
  	if (eccpos == 0) {
@@ -402,9 +413,12 @@ static int read_oob(void *buf, u32 size, u32 pg)
 
 	if (pagesize == 512)
 		coladdr = 0;
-	else
-		coladdr = pagesize;
-
+	else {
+		if (bus == 8)
+			coladdr = pagesize;
+		else
+			coladdr = pagesize / 2;
+	}
 	if (pagesize == 512)
 		/* Send READOOB command */
 		__nand_cmd(CMD_READC);
@@ -555,7 +569,7 @@ u32 nand_read_4750(void *buf, u32 startpage, u32 pagenum, int option)
 				if (stat & BCH_INTS_UNCOR) {
 					if (flag)
 					{
-						dprintf("Uncorrectable ECC error occurred\n");
+						serial_puts("Uncorrectable ECC error occurred\n");
 						handshake_PKT[3] = 1;
 					}
 				}
