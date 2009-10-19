@@ -200,7 +200,7 @@ void sdram_init_4750(void)
 
 	if (CONFIG_MOBILE_SDRAM == 1)
 		/* Mobile SDRAM Extended Mode Register */
-		sdemode = EMC_SDMR_SET_BA1 | EMC_SDMR_DS_FULL | EMC_SDMR_PRSR_ALL;
+		sdemode = EMC_SDMR_SET_BA1 | EMC_SDMR_DS_HALF | EMC_SDMR_PRSR_ALL;
 
 	/* Wait for precharge, > 200us */
 	tmp = (cpu_clk / 1000000) * 1000;
