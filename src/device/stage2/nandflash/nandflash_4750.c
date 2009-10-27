@@ -569,7 +569,7 @@ u32 nand_read_4750(void *buf, u32 startpage, u32 pagenum, int option)
 				if (stat & BCH_INTS_UNCOR) {
 					if (flag)
 					{
-						serial_puts("Uncorrectable ECC error occurred\n");
+						dprintf("Uncorrectable ECC error occurred\n");
 						handshake_PKT[3] = 1;
 					}
 				}
